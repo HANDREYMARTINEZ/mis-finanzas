@@ -45,3 +45,6 @@ android/app/src/main/assets/capacitor.plugins.json
 android/app/src/main/res/xml/config.xml
 *.apk
 *.aab
+
+# Config local del entorno de desarrollo
+.claude/

@@ -6,6 +6,28 @@ y cupos, lleva préstamos y deudas, metas de ahorro y presupuestos. Todo se guar
 
 Hecha con **React + Vite** y empaquetada como app Android con **Capacitor**.
 
+## Capturas
+
+Los datos que se ven son de demostración.
+
+| Dashboard | Movimientos | Estadísticas |
+|---|---|---|
+| <img src="docs/screenshots/01-dashboard.png" width="230"> | <img src="docs/screenshots/02-movimientos.png" width="230"> | <img src="docs/screenshots/03-estadisticas.png" width="230"> |
+| Balance del mes, patrimonio por cuenta y la gráfica de ingresos vs. gastos. | Historial con filtros, método de pago por movimiento y préstamos por cobrar. | Resumen, tasa de ahorro y reparto del gasto por categoría. |
+
+| Cuentas y tarjetas | Score de crédito | Préstamos |
+|---|---|---|
+| <img src="docs/screenshots/04-cuentas.png" width="230"> | <img src="docs/screenshots/05-credito.png" width="230"> | <img src="docs/screenshots/06-prestamos.png" width="230"> |
+| Saldos, cupos y porcentaje de uso de cada tarjeta. | Utilización del cupo, score estimado y guía por tramos. | Capital, interés, cuotas y registro de abonos parciales. |
+
+<img src="docs/screenshots/07-agregar.png" width="230" align="right">
+
+**Nuevo movimiento** — gasto o ingreso, con categoría, cuenta de origen (o reparto
+entre varias), método de pago, nota y fecha. Cada cuenta muestra su saldo o cupo
+disponible en el mismo selector.
+
+<br clear="right">
+
 ## Funciones
 
 - **Dashboard** — balance, ingresos vs. gastos y gráfica de área con periodos (día, semana, 15 días, mes, año o rango personalizado).
