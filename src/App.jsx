@@ -62,11 +62,42 @@ const SCROLLBAR_CSS = `
   @supports (min-height:100dvh){ .fin-app, .fin-screen { min-height:100dvh !important; } }
 `;
 
+// Íconos de trazo (mismo lenguaje en la barra inferior y las acciones rápidas)
+const ICON_PATHS = {
+  home:  <><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/></>,
+  list:  <><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h10"/></>,
+  plus:  <><path d="M12 5v14"/><path d="M5 12h14"/></>,
+  chart: <><path d="M5 20V10"/><path d="M12 20V4"/><path d="M19 20v-7"/></>,
+  wallet:<><rect x="3" y="6" width="18" height="14" rx="3"/><path d="M16 13h2"/><path d="M3 10h18"/></>,
+  down:  <><path d="M12 5v14"/><path d="M6 13l6 6 6-6"/></>,
+  up:    <><path d="M12 19V5"/><path d="M6 11l6-6 6 6"/></>,
+  swap:  <><path d="M4 8h14"/><path d="M14 4l4 4-4 4"/><path d="M20 16H6"/><path d="M10 12l-4 4 4 4"/></>,
+  search:<><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></>,
+  shield:<><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/></>,
+};
+const Icon = ({name, size=20, sw=2}) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{ICON_PATHS[name]}</svg>
+);
+
 const fmtCOP = n => new Intl.NumberFormat("es-CO",{style:"currency",currency:"COP",maximumFractionDigits:0}).format(n);
 const onlyDigits = v => (v==null?"":String(v)).replace(/\D/g,"");                 // "30.000" -> "30000"
 const fmtMiles   = v => { const d=onlyDigits(v); return d?Number(d).toLocaleString("es-CO"):""; }; // 30000 -> "30.000"
-const fmtDate = d => new Date(d).toLocaleDateString("es-CO",{day:"2-digit",month:"short"});
+// Eje Y compacto: 1.2M / 350K / 900. Antes Stats mostraba "0.0M" para montos chicos.
+const fmtAxis = v => { const a=Math.abs(v); return a>=1000000?`${(v/1000000).toFixed(1)}M`:a>=1000?`${(v/1000).toFixed(0)}K`:v; };
+// "YYYY-MM-DD" a secas se interpreta como medianoche UTC = día anterior en Colombia. Forzar hora local.
+const fmtDate = d => new Date(String(d).length===10 ? d+"T00:00:00" : d).toLocaleDateString("es-CO",{day:"2-digit",month:"short"});
 const today = () => { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; }; // fecha LOCAL (antes UTC: fechaba de noche al día siguiente en COT)
+
+function dayLabel(dateStr){
+  const d = new Date(dateStr+"T00:00:00");
+  const t = new Date(); t.setHours(0,0,0,0);
+  const diff = Math.round((t - d)/86400000);
+  const weekday = d.toLocaleDateString("es-CO",{weekday:"long"});
+  const dm = `${d.getDate()} ${d.toLocaleDateString("es-CO",{month:"short"}).replace(".","")}${d.getFullYear()!==t.getFullYear()?` ${d.getFullYear()}`:""}`;
+  if(diff===0) return {short:"Hoy",  head:"Hoy",  sub:`${weekday} ${dm}`};
+  if(diff===1) return {short:"Ayer", head:"Ayer", sub:`${weekday} ${dm}`};
+  return {short:fmtDate(dateStr), head:weekday.charAt(0).toUpperCase()+weekday.slice(1), sub:dm};
+}
 
 // ── AREA CHART COMPONENT ──────────────────────────────────────────
 const PERIODS = [
@@ -78,7 +109,7 @@ const PERIODS = [
   {id:"custom",label:"Rango"},
 ];
 
-function CustomSelect({value, onChange, options, placeholder="Seleccionar...", P}){
+function CustomSelect({value, onChange, options, placeholder="Seleccionar..."}){
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   useEffect(()=>{
@@ -197,7 +228,7 @@ function AreaChartCard({transactions, P, fmtCOP}){
 
     const now   = new Date();
     const toD   = (s)=>new Date(s+"T00:00:00");
-    const ymd   = (d)=>d.toISOString().split("T")[0];
+    const ymd   = (d)=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;  // local, no UTC
 
     // Determine window
     let fromDate, toDate = new Date(now);
@@ -310,7 +341,7 @@ function AreaChartCard({transactions, P, fmtCOP}){
               </linearGradient>
             </defs>
             <XAxis dataKey="displayLabel" tick={{fill:"#8888aa",fontSize:9}} axisLine={false} tickLine={false} interval="preserveStartEnd"/>
-            <YAxis tick={{fill:"#8888aa",fontSize:9}} axisLine={false} tickLine={false} tickFormatter={v=>v>=1000000?`${(v/1000000).toFixed(1)}M`:v>=1000?`${(v/1000).toFixed(0)}K`:v} width={38}/>
+            <YAxis tick={{fill:"#8888aa",fontSize:9}} axisLine={false} tickLine={false} tickFormatter={fmtAxis} width={38}/>
             <Tooltip formatter={v=>fmtCOP(v)} contentStyle={{background:"#17171f",border:"1px solid #2a2a3a",borderRadius:8,color:"#e2e2f0",fontSize:12}} labelStyle={{color:"#8888aa"}}/>
             <Area type="monotone" dataKey="income"  stroke="#34d399" strokeWidth={2} fill="url(#gI)" name="Ingresos" dot={chartData.length<=15?{fill:"#34d399",r:3}:false}/>
             <Area type="monotone" dataKey="expense" stroke="#f87171" strokeWidth={2} fill="url(#gE)" name="Gastos"   dot={chartData.length<=15?{fill:"#f87171",r:3}:false}/>
@@ -344,7 +375,7 @@ async function saveFile(filename, content, mime){
         const written = await FS.writeFile({path:filename, data:content, directory:"CACHE", encoding:"utf8"});
         await SH.share({title:filename, url:written.uri, dialogTitle:"Guardar o enviar respaldo"});
         return true;
-      }catch(e){ return false; }
+      }catch{ return false; }
     }
   }
   try{
@@ -352,9 +383,9 @@ async function saveFile(filename, content, mime){
     const url  = URL.createObjectURL(blob);
     const a    = document.createElement("a");
     a.href = url; a.download = filename; a.click();
-    URL.revokeObjectURL(url);
+    setTimeout(()=>URL.revokeObjectURL(url), 1000);  // revocar al instante cancela la descarga en algunos navegadores
     return true;
-  }catch(e){ return false; }
+  }catch{ return false; }
 }
 
 // ── PERSISTENCIA ──────────────────────────────────────────────────
@@ -369,7 +400,7 @@ const storageOK = (() => {
     window.localStorage.setItem(k, k);
     window.localStorage.removeItem(k);
     return true;
-  } catch (e) { return false; }
+  } catch { return false; }
 })();
 
 function loadState(){
@@ -377,13 +408,13 @@ function loadState(){
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     return raw ? JSON.parse(raw) : null;
-  } catch (e) { return null; }
+  } catch { return null; }
 }
 
 function saveState(state){
   const json = JSON.stringify(state);
   // localStorage: copia rápida y síncrona, permite arranque instantáneo
-  if(storageOK){ try { window.localStorage.setItem(STORAGE_KEY, json); } catch (e) {} }
+  if(storageOK){ try { window.localStorage.setItem(STORAGE_KEY, json); } catch { /* cuota llena: Preferences sigue guardando */ } }
   // Preferences: fuente de verdad en Android. Vive en SharedPreferences
   // nativo, así que sobrevive a la limpieza de caché del WebView.
   const PREFS = nativePlugin("Preferences");
@@ -406,19 +437,19 @@ export default function App() {
   const [cards, setCards]                 = useState(()=>pick("cards", []));   // [{id,bank,name,type,limit,used,color}]
   const [recurringTx, setRecurringTx]     = useState(()=>pick("recurringTx", []));  // [{id,type,amount,category,note,dayOfMonth,lastMonth}]
   const [creditPlans, setCreditPlans]     = useState(()=>pick("creditPlans", []));  // [{id,cardId,category,note,total,cuotas,cuotasPaid,cuotaAmount,date}]
+  const [transfers, setTransfers]         = useState(()=>pick("transfers", []));    // [{id,from,to,amount,note,date}] traslados entre cuentas propias
   const [nextId, setNextId]               = useState(()=>pick("nextId", 1));
 
   // UI state
   const [view, setView]       = useState("dashboard");
   const [subView, setSubView] = useState(null); // for nested panels
   const [delConfirm, setDelConfirm] = useState(null);
-  const [expandedLoan, setExpandedLoan] = useState(null);
-  const [expandedDebt, setExpandedDebt] = useState(null);
   const [statsFilter, setStatsFilter] = useState("total");
   const [statsFrom, setStatsFrom] = useState("");
   const [statsTo, setStatsTo]     = useState("");
 
   // Forms
+  const [trForm, setTrForm]     = useState({from:"",to:""});  // origen/destino de "Mover fondos" (monto/nota/fecha viven en txForm)
   const [txForm, setTxForm]     = useState({type:"expense",amount:"",category:"",note:"",date:today(),method:"",accountId:"",cuotas:"1",useSplit:false,splits:[]});
   const [filterType, setFilter] = useState("all");
   const [newCat, setNewCat]     = useState({type:"expense",name:""});
@@ -438,7 +469,14 @@ export default function App() {
   const notify = (msg)=>{ setUiError(msg); };
   useEffect(()=>{ if(!uiError) return; const t=setTimeout(()=>setUiError(null), 5000); return ()=>clearTimeout(t); },[uiError]);
   const [recurForm, setRecurForm] = useState({type:"expense",amount:"",category:"",note:"",dayOfMonth:"1",account:""});
-  const [creditTab, setCreditTab] = useState("cards"); // cards | score | tips | recurring
+  const [acctTab, setAcctTab]   = useState("cuentas");   // pestaña Cuentas: cuentas | prestamos
+  const [loanSide, setLoanSide] = useState("lend");      // préstamos: lend (me deben) | owe (debo)
+  const [showLoanForm, setShowLoanForm] = useState(false);
+  const [showDebtForm, setShowDebtForm] = useState(false);
+  const [loanOpen, setLoanOpen] = useState({});          // {loanId: "pay"|"detail"} panel abierto en cada préstamo
+  const [debtOpen, setDebtOpen] = useState({});          // {debtId: "pay"|"detail"}
+  const [showPaid, setShowPaid] = useState({lend:false, owe:false});
+  const [txSearch, setTxSearch] = useState("");
   const [receiveAcct, setReceiveAcct] = useState({}); // {loanId: accountId} cuenta donde entra el abono
   const [receiveSplitOn, setReceiveSplitOn] = useState({}); // {loanId: bool} recibir dividido en varias cuentas
   const [receiveSplits, setReceiveSplits]   = useState({}); // {loanId: [{accountId,amount}]}
@@ -474,9 +512,10 @@ export default function App() {
           if(d.cards)        setCards(d.cards);
           if(d.recurringTx)  setRecurringTx(d.recurringTx);
           if(d.creditPlans)  setCreditPlans(d.creditPlans);
+          if(d.transfers)    setTransfers(d.transfers);
           if(d.nextId)       setNextId(d.nextId);
         }
-      }catch(e){ /* si falla, seguimos con lo que ya hay en memoria */ }
+      }catch{ /* si falla, seguimos con lo que ya hay en memoria */ }
       if(!cancelled) setHydrated(true);
     })();
     return ()=>{ cancelled = true; };
@@ -486,8 +525,8 @@ export default function App() {
   // sobrescribiríamos lo guardado en nativo con el estado inicial.
   useEffect(()=>{
     if(!hydrated) return;
-    saveState({ version:1, transactions, expCats, incCats, budgets, goals, loans, debts, cards, recurringTx, creditPlans, nextId });
-  },[hydrated,transactions,expCats,incCats,budgets,goals,loans,debts,cards,recurringTx,creditPlans,nextId]);
+    saveState({ version:1, transactions, expCats, incCats, budgets, goals, loans, debts, cards, recurringTx, creditPlans, transfers, nextId });
+  },[hydrated,transactions,expCats,incCats,budgets,goals,loans,debts,cards,recurringTx,creditPlans,transfers,nextId]);
   // ── Barra de estado (Android) ───────────────────────────────────
   useEffect(()=>{
     if(!isNative) return;
@@ -521,7 +560,9 @@ export default function App() {
   const balance = totalIncome - totalExpense;
 
   // ── Mes en curso vs mes anterior ────────────────────────────────
-  const monthKeys = useMemo(()=>{
+  // Se calcula en cada render (es barato): con useMemo([]) el mes quedaba
+  // congelado si la app seguía abierta en segundo plano al cambiar de mes.
+  const monthKeys = (()=>{
     const n = new Date();
     const mk = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
     const p  = new Date(n.getFullYear(), n.getMonth()-1, 1);
@@ -530,16 +571,19 @@ export default function App() {
       label:     n.toLocaleDateString("es-CO",{month:"long"}),
       prevLabel: p.toLocaleDateString("es-CO",{month:"long"}),
     };
-  },[]);
+  })();
 
-  const sumMonth = (mk,type) => transactions
-    .filter(t=>t.date.slice(0,7)===mk && t.type===type)
-    .reduce((s,t)=>s+t.amount,0);
-
-  const monthIncome  = useMemo(()=>sumMonth(monthKeys.cur,"income"), [transactions,monthKeys]);
-  const monthExpense = useMemo(()=>sumMonth(monthKeys.cur,"expense"),[transactions,monthKeys]);
+  const {monthIncome, monthExpense, prevBalance} = useMemo(()=>{
+    const sum = (mk,type) => transactions
+      .filter(t=>t.date.slice(0,7)===mk && t.type===type)
+      .reduce((s,t)=>s+t.amount,0);
+    return {
+      monthIncome:  sum(monthKeys.cur,"income"),
+      monthExpense: sum(monthKeys.cur,"expense"),
+      prevBalance:  sum(monthKeys.prev,"income")-sum(monthKeys.prev,"expense"),
+    };
+  },[transactions,monthKeys.cur,monthKeys.prev]);
   const monthBalance = monthIncome - monthExpense;
-  const prevBalance  = useMemo(()=>sumMonth(monthKeys.prev,"income")-sumMonth(monthKeys.prev,"expense"),[transactions,monthKeys]);
   const monthDelta   = prevBalance!==0 ? Math.round(((monthBalance-prevBalance)/Math.abs(prevBalance))*100) : null;
   const monthSaveRate = monthIncome>0 ? Math.round((monthBalance/monthIncome)*100) : 0;
 
@@ -550,7 +594,7 @@ export default function App() {
       .filter(t=>t.type==="expense" && t.date.slice(0,7)===monthKeys.cur)
       .forEach(t=>{ m[t.category]=(m[t.category]||0)+t.amount; });
     return m;
-  },[transactions,monthKeys]);
+  },[transactions,monthKeys.cur]);
 
   const budgetRows = useMemo(()=>Object.entries(budgets)
     .filter(([,limit])=>limit>0)
@@ -569,20 +613,26 @@ export default function App() {
     return m;
   },[transactions]);
 
-  const categoryData = useMemo(()=>
-    Object.entries(catSpend).map(([name,value])=>({name,value})).sort((a,b)=>b.value-a.value)
-  ,[catSpend]);
-
-  const monthlyData = useMemo(()=>{
-    const m={};
-    transactions.forEach(t=>{ const mo=t.date.slice(0,7); if(!m[mo])m[mo]={month:mo,income:0,expense:0}; m[mo][t.type]+=t.amount; });
-    return Object.values(m).sort((a,b)=>a.month.localeCompare(b.month));
-  },[transactions]);
-
-  const filtered = useMemo(()=>[...transactions]
+  // Los traslados se muestran junto a los movimientos (kind:"transfer") pero
+  // nunca entran en sumas de ingresos/gastos, que siguen leyendo `transactions`.
+  const filtered = useMemo(()=>{
+    const name = id => { const c=cards.find(x=>x.id===id); return c?c.name:""; };
+    const q = txSearch.trim().toLowerCase();
+    return [
+      ...transactions.map(t=>({...t,kind:"tx"})),
+      ...transfers.map(t=>({...t,kind:"transfer",type:"transfer"})),
+    ]
     .filter(t=>filterType==="all"||t.type===filterType)
-    .sort((a,b)=>b.date.localeCompare(a.date))
-  ,[transactions,filterType]);
+    .filter(t=>!q || [t.note,t.category,t.method,name(t.accountId),name(t.from),name(t.to)].some(v=>v&&String(v).toLowerCase().includes(q)))
+    .sort((a,b)=>b.date.localeCompare(a.date) || b.id-a.id);
+  },[transactions,transfers,filterType,txSearch,cards]);
+
+  // Inicio: los 4 últimos registrados (por orden de registro, como antes), incluidos traslados
+  const recentMoves = useMemo(()=>[
+      ...transactions.map(t=>({...t,kind:"tx"})),
+      ...transfers.map(t=>({...t,kind:"transfer",type:"transfer"})),
+    ].sort((a,b)=>b.id-a.id).slice(0,4)
+  ,[transactions,transfers]);
 
   // Stats period filter
   const filteredForStats = useMemo(()=>{
@@ -698,13 +748,17 @@ export default function App() {
     }
     // Compra a crédito: sube la deuda de la tarjeta (baja el cupo). NO toca el efectivo hasta pagar cada cuota.
     if(selCard && selCard.type==="credito" && txForm.type==="expense"){
+      if(amount>availableFunds(selCard)){
+        notify(`${selCard.name} no tiene cupo suficiente (disponible: ${fmtCOP(availableFunds(selCard))}). Elige otra tarjeta o divide el pago.`);
+        return;
+      }
       const cuotas = Math.max(1, parseInt(txForm.cuotas)||1);
       const plan = { id, cardId:accId, category:txForm.category, note:txForm.note, total:amount, cuotas, cuotasPaid:0, cuotaAmount:Math.round(amount/cuotas), date:txForm.date };
       setCreditPlans(prev=>[...prev, plan]);
       adjustAccount(accId, amount);   // aumenta la deuda usada de la tarjeta
       setNextId(id+1);
       resetTxForm();
-      setCreditTab("cards"); setSubView(null); setView("credit");
+      setAcctTab("cuentas"); setSubView(null); setView("credit");
       return;
     }
     setTransactions(prev=>[...prev,{...txForm, amount, accountId:accId, id}]);
@@ -712,6 +766,55 @@ export default function App() {
     setNextId(id+1);
     resetTxForm();
     setView("transactions");
+  }
+
+  // ── Mover fondos entre cuentas propias ───────────────────────────
+  // No es ingreso ni gasto: el patrimonio no cambia, solo dónde está la plata.
+  // Por eso vive aparte de `transactions` y no entra en balances ni estadísticas.
+  // Solo cuentas de dinero; una tarjeta de crédito no puede recibir ni enviar.
+  function addTransfer(e){
+    e.preventDefault();
+    const amount = parseFloat(txForm.amount)||0;
+    const from = accounts.find(a=>a.id===trForm.from);
+    const to   = accounts.find(a=>a.id===trForm.to);
+    if(amount<=0){ notify("Escribe cuánto vas a mover."); return; }
+    if(!from || !to){ notify("Elige la cuenta de origen y la de destino."); return; }
+    if(from.id===to.id){ notify("El origen y el destino deben ser cuentas distintas."); return; }
+    if(amount>availableFunds(from)){ notify(`${from.name} no tiene fondos suficientes (disponible: ${fmtCOP(availableFunds(from))}).`); return; }
+    adjustAccount(from.id, -amount);
+    adjustAccount(to.id, amount);
+    setTransfers(prev=>[...prev,{ id:nextId, from:from.id, to:to.id, amount, note:txForm.note, date:txForm.date }]);
+    setNextId(n=>n+1);
+    setTxForm(f=>({...f, amount:"", note:"", date:today()}));
+    setTrForm({from:"",to:""});
+    setFilter("all");
+    setView("transactions");
+  }
+
+  // Deshacer un traslado: la plata vuelve a la cuenta de origen.
+  function deleteTransfer(tr){
+    adjustAccount(tr.to, -tr.amount);
+    adjustAccount(tr.from, tr.amount);
+    setTransfers(p=>p.filter(x=>x.id!==tr.id));
+    setDelConfirm(null);
+  }
+
+  // Borrar un movimiento devuelve su efecto en los saldos. En los divididos
+  // `accountId` es null y el dinero está en `splits`: antes no se revertía nada.
+  // Las porciones pagadas con tarjeta de crédito no están en el movimiento
+  // (son compras a cuotas aparte), así que solo se revierten cuentas de dinero.
+  function deleteTransaction(t){
+    const sign = t.type==="income" ? -1 : 1;
+    if(t.accountId!=null){
+      adjustAccount(t.accountId, sign*t.amount);
+    } else if(Array.isArray(t.splits)){
+      t.splits.forEach(r=>{
+        const card = cards.find(c=>c.id===r.accountId);
+        if(card && card.type!=="credito") adjustAccount(r.accountId, sign*(parseFloat(r.amount)||0));
+      });
+    }
+    setTransactions(p=>p.filter(x=>x.id!==t.id));
+    setDelConfirm(null);
   }
 
   function addCategory(){
@@ -737,7 +840,8 @@ export default function App() {
     e.preventDefault();
     if(!goalForm.name||!goalForm.target)return;
     if(editGoal!==null){
-      setGoals(prev=>prev.map(g=>g.id===editGoal?{...g,name:goalForm.name,target:parseFloat(goalForm.target),saved:parseFloat(goalForm.saved)||g.saved}:g));
+      // Campo vacío = conservar lo ahorrado; "0" sí lo pone en cero (antes se ignoraba).
+      setGoals(prev=>prev.map(g=>g.id===editGoal?{...g,name:goalForm.name,target:parseFloat(goalForm.target),saved:goalForm.saved===""?g.saved:(parseFloat(goalForm.saved)||0)}:g));
       setEditGoal(null);
     } else {
       setGoals(prev=>[...prev,{id:nextId,name:goalForm.name,target:parseFloat(goalForm.target),saved:parseFloat(goalForm.saved)||0}]);
@@ -777,6 +881,7 @@ export default function App() {
       setNextId(n=>n+1);
     }
     setLoanForm({debtor:"",amount:"",interest:"",interestType:"simple",months:"",date:today(),note:"",account:"",useSplit:false,splits:[]});
+    setShowLoanForm(false);
   }
 
   function toggleLoanPaid(id){
@@ -813,7 +918,8 @@ export default function App() {
       destOrSplits.forEach(r=>adjustAccount(r.accountId, parseFloat(r.amount)||0));
     } else {
       const dest = (destOrSplits===undefined||destOrSplits===null||destOrSplits==="") ? loan.account : destOrSplits;
-      if(dest==null||dest==="") return;             // sin cuenta destino
+      // Sin cuenta destino válida (p. ej. la original se eliminó): el abono se perdería.
+      if(dest==null||dest===""||!accounts.some(a=>a.id===dest)){ notify("Elige en qué cuenta recibes el pago."); return; }
       adjustAccount(dest, amt);                     // el capital + interés vuelve a tu cuenta
     }
     const newReceived = (loan.received||0) + amt;
@@ -864,6 +970,7 @@ export default function App() {
       setNextId(n=>n+1);
     }
     setDebtForm({lender:"",amount:"",interest:"",interestType:"simple",months:"",date:today(),note:"",account:"",useSplit:false,splits:[]});
+    setShowDebtForm(false);
   }
 
   // Estado de una deuda: cuánto debes en total (capital+interés), cuánto ya pagaste, cuánto falta.
@@ -892,7 +999,7 @@ export default function App() {
       srcOrSplits.forEach(r=>adjustAccount(r.accountId, -(parseFloat(r.amount)||0)));
     } else {
       const src = (srcOrSplits===undefined||srcOrSplits===null||srcOrSplits==="") ? debt.account : srcOrSplits;
-      if(src==null||src==="") return;
+      if(src==null||src===""){ notify("Elige de qué cuenta sale el pago."); return; }
       const card = accounts.find(a=>a.id===src);
       if(!card || amt>availableFunds(card)){ notify(`${card?card.name:"Esa cuenta"} no tiene fondos suficientes para este pago. Elige otra cuenta o divide el pago.`); return; }
       adjustAccount(src, -amt);
@@ -962,7 +1069,7 @@ export default function App() {
         const ctx=cv.getContext("2d");
         const sc=Math.max(S/img.width, S/img.height), w=img.width*sc, h=img.height*sc;
         ctx.drawImage(img,(S-w)/2,(S-h)/2,w,h);
-        try{ setCardForm(f=>({...f, logo:cv.toDataURL("image/jpeg",0.82)})); }catch(err){}
+        try{ setCardForm(f=>({...f, logo:cv.toDataURL("image/jpeg",0.82)})); }catch{ /* canvas no exportable: se queda sin logo */ }
       };
       img.src = ev.target.result;
     };
@@ -970,29 +1077,59 @@ export default function App() {
     e.target.value="";
   }
 
-  // Encabezado de acordeón para la vista de Cuentas. Una sección abierta a la vez.
-  const accHead = (id, icon, label) => {
-    const open = creditTab===id;
+  const s = ST(P);
+  // El + va al centro: es la acción más usada y queda bajo el pulgar.
+  const navItems=[
+    {id:"dashboard",   icon:<Icon name="home"  sw={1.9}/>, label:"Inicio"},
+    {id:"transactions",icon:<Icon name="list"  sw={1.9}/>, label:"Movimientos"},
+    {id:"add",         icon:<Icon name="plus"  size={22} sw={2.2}/>, label:"Agregar"},
+    {id:"stats",       icon:<Icon name="chart" sw={1.9}/>, label:"Stats"},
+    {id:"credit",      icon:<Icon name="wallet" sw={1.9}/>, label:"Cuentas"},
+  ];
+
+  // Abre "Agregar" directamente en el modo pedido (acciones rápidas del Inicio)
+  const startAdd = type => {
+    setTxForm(f=>({...f,type,category:"",method:"",accountId:"",cuotas:"1",useSplit:false,splits:[],date:f.amount?f.date:today()}));
+    setView("add"); setSubView(null);
+  };
+  const goAccounts = tab => { setView("credit"); setAcctTab(tab||"cuentas"); setSubView(null); };
+
+  const acctName = id => { const c=cards.find(x=>x.id===id); return c?c.name:null; };
+  // Una fila de movimiento (gasto, ingreso o traslado). `actions` agrega ✨ y borrar.
+  const renderMove = (t, {actions=false, date=false, last=false}={}) => {
+    const isTr  = t.kind==="transfer";
+    const color = isTr?P.accent:t.type==="income"?P.income:P.expense;
+    const title = isTr ? `${acctName(t.from)||"Cuenta eliminada"} → ${acctName(t.to)||"Cuenta eliminada"}` : t.category;
+    const where = isTr ? null : t.accountId!=null ? acctName(t.accountId) : (Array.isArray(t.splits)&&t.splits.length ? "Varias cuentas" : t.method);
+    const sub   = isTr ? (t.note||"Traslado entre cuentas") : ([t.note,where].filter(Boolean).join(" · ")||"—");
+    const ell   = {overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"};
     return (
-      <button onClick={()=>setCreditTab(t=>t===id?null:id)}
-        style={{width:"100%",display:"flex",alignItems:"center",gap:11,background:open?"rgba(129,140,248,0.08)":P.card,border:`1px solid ${open?P.accent:P.cardBorder}`,borderRadius:14,padding:"14px 16px",marginBottom:10,cursor:"pointer"}}>
-        <span style={{fontSize:18}}>{icon}</span>
-        <span style={{flex:1,textAlign:"left",fontWeight:700,fontSize:15,color:open?P.accent:P.text}}>{label}</span>
-        <span style={{color:open?P.accent:P.muted,fontSize:16,display:"inline-block",transform:open?"rotate(90deg)":"none",transition:"transform 0.2s"}}>›</span>
-      </button>
+      <div key={t.id} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 0",borderBottom:last?"none":"1px solid rgba(255,255,255,0.05)"}}>
+        <div style={s.txIcon(isTr?"transfer":t.type)}>{isTr?"⇄":t.type==="income"?"▲":"▼"}</div>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{...s.txCat,...ell}}>{title}</div>
+          <div style={{...s.txNote,...ell}}>{sub}</div>
+        </div>
+        <div style={{textAlign:"right",flexShrink:0,display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4}}>
+          <div style={{color,fontWeight:700,fontSize:14,fontVariantNumeric:"tabular-nums"}}>{isTr?"":t.type==="income"?"+":"−"}{fmtCOP(t.amount)}</div>
+          {date && <div style={s.txDate}>{dayLabel(t.date).short}</div>}
+          {actions && (
+            <div style={{display:"flex",gap:4}}>
+              {!isTr && t.type==="expense" && <button onClick={()=>getAiSuggestion(t)} aria-label="Sugerencia de pago" style={{background:"rgba(129,140,248,0.1)",border:"none",color:P.accent,borderRadius:8,padding:"3px 7px",cursor:"pointer",fontSize:11}}>✨</button>}
+              {delConfirm===t.id?(
+                <div style={{display:"flex",gap:6}}>
+                  <button onClick={()=>isTr?deleteTransfer(t):deleteTransaction(t)} style={s.delConfirm}>Sí</button>
+                  <button onClick={()=>setDelConfirm(null)} style={s.delCancel}>No</button>
+                </div>
+              ):<button onClick={()=>setDelConfirm(t.id)} aria-label={isTr?"Deshacer traslado":"Borrar movimiento"} style={s.delBtn}>✕</button>}
+            </div>
+          )}
+        </div>
+      </div>
     );
   };
 
-  const s = ST(P);
-  const navItems=[
-    {id:"dashboard",icon:"◈",label:"Inicio"},
-    {id:"add",icon:"+",label:"Agregar"},
-    {id:"transactions",icon:"≡",label:"Movimientos"},
-    {id:"stats",icon:"◉",label:"Stats"},
-    {id:"credit",icon:"👛",label:"Cuentas"},
-  ];
-
-  const headerTitles={dashboard:"Mi Finanzas",add:"Nuevo movimiento",transactions:"Movimientos",stats:"Estadísticas",loans:"Préstamos",credit:"Cuentas",settings:"Configuración",goals:"Metas",budget:"Presupuesto",categories:"Categorías"};
+  const headerTitles={dashboard:"Mi Finanzas",add:"Nuevo movimiento",transactions:"Movimientos",stats:"Estadísticas",loans:"Préstamos",credit:"Cuentas",settings:"Configuración",goals:"Metas",budget:"Presupuesto",categories:"Categorías",exportimport:"Exportar / Importar",health:"Salud del crédito",recurring:"Recurrentes"};
 
   // Credit score calculation
   // Solo tarjetas de crédito: en débito/ahorros `used` es "saldo disponible", no deuda.
@@ -1138,7 +1275,7 @@ export default function App() {
       } else {
         metodoPago="Efectivo"; tarjetaSugerida=null;
         razon="Sin tarjetas configuradas. Agrega tus cuentas para recibir sugerencias personalizadas.";
-        impactoCredito="neutral"; tip="Registra tus tarjetas en la pestaña Crédito → Tarjetas.";
+        impactoCredito="neutral"; tip="Registra tus tarjetas en Cuentas → Cuentas y tarjetas.";
       }
     }
 
@@ -1197,32 +1334,48 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Cuentas y patrimonio */}
-              <div style={s.card}>
-                <div style={s.cardRowSb}>
-                  <span style={s.cardTitle}>Cuentas y patrimonio</span>
-                  <button onClick={()=>{setView("credit");setCreditTab("cards");setSubView(null);}} style={{background:"none",border:"none",color:P.accent,fontSize:12,fontWeight:600,cursor:"pointer",padding:0}}>Gestionar</button>
-                </div>
-                <div style={{fontSize:11,color:P.textSub,letterSpacing:0.5,textTransform:"uppercase",marginBottom:2}}>Patrimonio total</div>
-                <div style={{fontSize:28,fontWeight:800,color:patrimonio>=0?P.income:P.expense,fontVariantNumeric:"tabular-nums",marginBottom:4}}>{fmtCOP(patrimonio)}</div>
-                <div style={{display:"flex",flexWrap:"wrap",gap:"2px 12px",fontSize:11,color:P.textSub,marginBottom:accounts.length?12:0}}>
-                  <span>Líquido {fmtCOP(liquidTotal)}</span>
-                  {porCobrar>0 && <span>· Por cobrar {fmtCOP(porCobrar)}</span>}
-                  {porPagar>0 && <span style={{color:P.expense}}>· Debes (deudas) {fmtCOP(porPagar)}</span>}
-                  {creditDebt>0 && <span style={{color:P.textSub}}>· Debes en tarjetas {fmtCOP(creditDebt)} (se paga por cuotas)</span>}
+              {/* Acciones rápidas */}
+              <div style={{display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:10,marginBottom:16}}>
+                {[["expense","Gasto",P.expense,"248,113,113","down"],["income","Ingreso",P.income,"52,211,153","up"],["transfer","Mover",P.accent,"129,140,248","swap"]].map(([t,l,c,rgb,ic])=>(
+                  <button key={t} onClick={()=>startAdd(t)}
+                    style={{height:72,borderRadius:18,border:`1px solid rgba(${rgb},0.3)`,background:`rgba(${rgb},0.08)`,color:c,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:6,fontWeight:700,fontSize:13,cursor:"pointer"}}>
+                    <Icon name={ic} sw={2.2}/>{l}
+                  </button>
+                ))}
+              </div>
+
+              {/* Tus cuentas: carrusel horizontal */}
+              <div style={{marginBottom:16}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end",padding:"2px 4px 10px"}}>
+                  <div>
+                    <div style={{...s.cardTitle,marginBottom:0}}>Tus cuentas</div>
+                    <div style={{fontSize:20,fontWeight:800,marginTop:4,color:patrimonio>=0?P.text:P.expense,fontVariantNumeric:"tabular-nums"}}>{fmtCOP(patrimonio)} <span style={{fontSize:12,fontWeight:500,color:P.textSub}}>patrimonio</span></div>
+                  </div>
+                  <button onClick={()=>goAccounts("cuentas")} style={{background:"none",border:"none",color:P.accent,fontSize:12,fontWeight:600,cursor:"pointer",padding:"6px 0"}}>Ver todas ›</button>
                 </div>
                 {accounts.length===0 ? (
-                  <div style={{fontSize:12,color:P.textSub}}>Crea tus cuentas (Efectivo, Bancolombia, Nequi…) en <strong style={{color:P.accent}}>Crédito → Tarjetas</strong> para ver y configurar tus saldos aquí.</div>
-                ) : accounts.map(a=>(
-                  <div key={a.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
-                    {renderLogo(a,30)}
-                    <div style={{flex:1}}>
-                      <div style={{fontSize:13,color:P.text,fontWeight:600}}>{a.name}</div>
-                      <div style={{fontSize:11,color:P.textSub,textTransform:"capitalize"}}>{a.type}</div>
-                    </div>
-                    <div style={{fontSize:14,fontWeight:700,color:(a.used||0)>=0?P.text:P.expense,fontVariantNumeric:"tabular-nums"}}>{fmtCOP(a.used||0)}</div>
+                  <div style={{...s.card,padding:"14px",marginBottom:0}}>
+                    <div style={{fontSize:12,color:P.textSub}}>Crea tus cuentas (Efectivo, Bancolombia, Nequi…) en <strong style={{color:P.accent}}>Cuentas</strong> para ver y configurar tus saldos aquí.</div>
                   </div>
-                ))}
+                ) : (
+                  <div className="hide-sb" style={{display:"flex",gap:10,overflowX:"auto",margin:"0 -16px",padding:"0 16px",scrollSnapType:"x mandatory"}}>
+                    {accounts.map(a=>(
+                      <button key={a.id} onClick={()=>goAccounts("cuentas")}
+                        style={{flex:"0 0 132px",textAlign:"left",background:P.card,border:`1px solid ${P.cardBorder}`,borderRadius:18,padding:14,cursor:"pointer",scrollSnapAlign:"start"}}>
+                        {renderLogo(a,32)}
+                        <div style={{fontSize:12,color:P.textSub,marginTop:12,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{a.name}</div>
+                        <div style={{fontSize:15,fontWeight:700,color:(a.used||0)>=0?P.text:P.expense,fontVariantNumeric:"tabular-nums"}}>{fmtCOP(a.used||0)}</div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {(porCobrar>0||porPagar>0||creditDebt>0) && (
+                  <div style={{display:"flex",flexWrap:"wrap",gap:"2px 12px",fontSize:11,color:P.textSub,padding:"10px 4px 0"}}>
+                    {porCobrar>0 && <span>Te deben {fmtCOP(porCobrar)}</span>}
+                    {porPagar>0 && <span style={{color:P.expense}}>Debes {fmtCOP(porPagar)}</span>}
+                    {creditDebt>0 && <span>Tarjetas {fmtCOP(creditDebt)} (se paga por cuotas)</span>}
+                  </div>
+                )}
               </div>
 
               {/* Area Chart Ingresos vs Gastos con filtros */}
@@ -1316,47 +1469,85 @@ export default function App() {
 
               {/* Recent transactions */}
               <div style={s.card}>
-                <div style={s.cardTitle}>Últimos movimientos</div>
-                {transactions.length===0?(
+                <div style={{...s.cardRowSb,marginBottom:4}}>
+                  <span style={{...s.cardTitle,marginBottom:0}}>Últimos movimientos</span>
+                  {recentMoves.length>0 && <button onClick={()=>{setView("transactions");setSubView(null);}} style={{background:"none",border:"none",color:P.accent,fontSize:12,fontWeight:600,cursor:"pointer",padding:0}}>Ver todos ›</button>}
+                </div>
+                {recentMoves.length===0?(
                   <div style={{textAlign:"center",padding:"24px 0"}}>
                     <div style={{fontSize:36,marginBottom:10}}>◈</div>
                     <div style={{color:P.text,fontWeight:600,marginBottom:6}}>Todo listo para empezar</div>
                     <div style={{color:P.textSub,fontSize:13,marginBottom:16}}>Registra tu primer ingreso o gasto</div>
-                    <button onClick={()=>setView("add")} style={s.accentBtn}>+ Agregar movimiento</button>
+                    <button onClick={()=>startAdd("expense")} style={s.accentBtn}>+ Agregar movimiento</button>
                   </div>
-                ):transactions.slice(-4).reverse().map(t=>(
-                  <div key={t.id} style={s.txRow}>
-                    <div style={s.txIcon(t.type)}>{t.type==="income"?"▲":"▼"}</div>
-                    <div style={{flex:1}}>
-                      <div style={s.txCat}>{t.category}</div>
-                      <div style={{display:"flex",alignItems:"center",gap:6,marginTop:2,flexWrap:"wrap"}}>
-                        {t.method&&<span style={{fontSize:11,padding:"2px 7px",borderRadius:20,background:"rgba(129,140,248,0.1)",color:P.accent,fontWeight:600}}>{METHOD_ICONS[t.method]||"💱"} {t.method}</span>}
-                        <span style={s.txNote}>{t.note||"—"}</span>
-                      </div>
-                    </div>
-                    <div style={{textAlign:"right"}}>
-                      <div style={{color:t.type==="income"?P.income:P.expense,fontWeight:600,fontSize:14}}>{t.type==="income"?"+":"-"}{fmtCOP(t.amount)}</div>
-                      <div style={s.txDate}>{fmtDate(t.date)}</div>
-                    </div>
-                  </div>
-                ))}
+                ):recentMoves.map((t,i)=>renderMove(t,{date:true,last:i===recentMoves.length-1}))}
               </div>
             </div>
           )}
 
           {/* ── ADD TRANSACTION ── */}
           {view==="add" && (
-            <form onSubmit={addTransaction}>
+            <form onSubmit={txForm.type==="transfer"?addTransfer:addTransaction}>
               <div style={s.toggleRow}>
-                {["expense","income"].map(t=>(
+                {[["expense","▼ Gasto"],["income","▲ Ingreso"],["transfer","⇄ Mover"]].map(([t,l])=>(
                   <button key={t} type="button" onClick={()=>setTxForm(f=>({...f,type:t,category:"",method:"",accountId:"",cuotas:"1",useSplit:false,splits:[]}))} style={s.toggleBtn(txForm.type===t,t)}>
-                    {t==="income"?"▲ Ingreso":"▼ Gasto"}
+                    {l}
                   </button>
                 ))}
               </div>
               <div style={s.fieldGroup}><label style={s.label}>Monto (COP)</label>
                 <input style={s.input} type="text" inputMode="numeric" placeholder="0" value={fmtMiles(txForm.amount)} onChange={e=>setTxForm(f=>({...f,amount:onlyDigits(e.target.value)}))} required/>
               </div>
+              {txForm.type==="transfer" ? (()=>{
+                const amt  = parseFloat(txForm.amount)||0;
+                const from = accounts.find(a=>a.id===trForm.from);
+                const to   = accounts.find(a=>a.id===trForm.to);
+                const short = from && amt>availableFunds(from);
+                const chip = (a, on, onClick, disabled) => (
+                  <button key={a.id} type="button" disabled={disabled} onClick={onClick}
+                    style={{display:"flex",alignItems:"center",gap:10,width:"100%",padding:"10px 12px",borderRadius:14,border:`1.5px solid ${on?P.accent:P.cardBorder}`,background:on?"rgba(129,140,248,0.1)":"transparent",cursor:disabled?"default":"pointer",opacity:disabled?0.35:1,textAlign:"left"}}>
+                    {renderLogo(a,30)}
+                    <span style={{flex:1,fontSize:14,fontWeight:600,color:on?P.accent:P.text}}>{a.name}</span>
+                    <span style={{fontSize:13,fontWeight:600,color:P.textSub,fontVariantNumeric:"tabular-nums"}}>{fmtCOP(a.used||0)}</span>
+                  </button>
+                );
+                if(accounts.length<2) return (
+                  <div style={{...s.card,padding:"14px"}}>
+                    <div style={{fontSize:13,color:P.textSub,lineHeight:1.5}}>Para mover fondos necesitas al menos dos cuentas de dinero (Efectivo, Bancolombia, Nequi…). Créalas en <strong style={{color:P.accent}}>Cuentas → Cuentas y tarjetas</strong>.</div>
+                  </div>
+                );
+                return (
+                  <>
+                    <div style={s.fieldGroup}><label style={s.label}>Desde</label>
+                      <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                        {accounts.map(a=>chip(a, trForm.from===a.id, ()=>setTrForm(f=>({from:a.id, to:f.to===a.id?"":f.to})), false))}
+                      </div>
+                    </div>
+                    <div style={{display:"flex",justifyContent:"center",margin:"-8px 0 10px"}}>
+                      <button type="button" title="Intercambiar origen y destino" onClick={()=>setTrForm(f=>({from:f.to,to:f.from}))}
+                        style={{width:40,height:40,borderRadius:12,border:`1px solid ${P.cardBorder}`,background:P.card,color:P.accent,fontSize:18,cursor:"pointer"}}>⇅</button>
+                    </div>
+                    <div style={s.fieldGroup}><label style={s.label}>Hacia</label>
+                      <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                        {accounts.map(a=>chip(a, trForm.to===a.id, ()=>setTrForm(f=>({...f,to:a.id})), a.id===trForm.from))}
+                      </div>
+                    </div>
+                    {short && (
+                      <div style={{marginTop:-8,marginBottom:18,padding:"11px 13px",borderRadius:12,background:"rgba(248,113,113,0.09)",border:"1px solid rgba(248,113,113,0.35)"}}>
+                        <div style={{fontSize:12,fontWeight:700,marginBottom:3,color:P.expense}}>Saldo insuficiente</div>
+                        <div style={{fontSize:11,color:P.textSub}}>{from.name} tiene {fmtCOP(availableFunds(from))}.</div>
+                      </div>
+                    )}
+                    {from && to && amt>0 && !short && (
+                      <div style={{marginTop:-8,marginBottom:18,padding:"11px 13px",borderRadius:12,background:"rgba(129,140,248,0.07)",border:"1px solid rgba(129,140,248,0.25)",fontSize:12,color:P.textSub,lineHeight:1.6,fontVariantNumeric:"tabular-nums"}}>
+                        <div>{from.name}: {fmtCOP(from.used||0)} → <strong style={{color:P.text}}>{fmtCOP((from.used||0)-amt)}</strong></div>
+                        <div>{to.name}: {fmtCOP(to.used||0)} → <strong style={{color:P.text}}>{fmtCOP((to.used||0)+amt)}</strong></div>
+                        <div style={{marginTop:4,fontSize:11}}>No cuenta como ingreso ni gasto.</div>
+                      </div>
+                    )}
+                  </>
+                );
+              })() : (<>
               <div style={s.fieldGroup}><label style={s.label}>Categoría</label>
                 <CustomSelect
                   value={txForm.category}
@@ -1443,7 +1634,7 @@ export default function App() {
                 </div>
               ) : (
                 <div style={{...s.card,padding:"12px 14px"}}>
-                  <div style={{fontSize:12,color:P.textSub}}>Aún no tienes cuentas ni tarjetas. Créalas en <strong style={{color:P.accent}}>Crédito → Tarjetas</strong> y los movimientos ajustarán tu saldo.</div>
+                  <div style={{fontSize:12,color:P.textSub}}>Aún no tienes cuentas ni tarjetas. Créalas en <strong style={{color:P.accent}}>Cuentas → Cuentas y tarjetas</strong> y los movimientos ajustarán tu saldo.</div>
                 </div>
               )}
 
@@ -1471,72 +1662,69 @@ export default function App() {
                   ))}
                 </div>
               </div>
+              </>)}
               <div style={s.fieldGroup}><label style={s.label}>Nota (opcional)</label>
-                <input style={s.input} type="text" placeholder="Descripción breve..." value={txForm.note} onChange={e=>setTxForm(f=>({...f,note:e.target.value}))}/>
+                <input style={s.input} type="text" placeholder={txForm.type==="transfer"?"Ej: retiro en cajero":"Descripción breve..."} value={txForm.note} onChange={e=>setTxForm(f=>({...f,note:e.target.value}))}/>
               </div>
               <div style={s.fieldGroup}><label style={s.label}>Fecha</label>
                 <input style={s.input} type="date" value={txForm.date} onChange={e=>setTxForm(f=>({...f,date:e.target.value}))}/>
               </div>
-              <button type="submit" style={s.submitBtn(txForm.type)}>{txForm.type==="income"?"Registrar ingreso ▲":"Registrar gasto ▼"}</button>
+              {txForm.type==="transfer"
+                ? (accounts.length>=2 && <button type="submit" style={{...s.submitBtn("income"),background:`linear-gradient(135deg,#6d28d9,${P.accent})`,boxShadow:"0 4px 20px rgba(129,140,248,0.25)"}}>Mover fondos ⇄</button>)
+                : <button type="submit" style={s.submitBtn(txForm.type)}>{txForm.type==="income"?"Registrar ingreso ▲":"Registrar gasto ▼"}</button>}
             </form>
           )}
 
-          {/* ── TRANSACTIONS ── */}
-          {view==="transactions" && (
-            <div>
-              <div style={s.filterRow}>
-                {[["all","Todos"],["income","Ingresos"],["expense","Gastos"]].map(([v,l])=>(
-                  <button key={v} onClick={()=>setFilter(v)} style={s.filterBtn(filterType===v)}>{l}</button>
-                ))}
-              </div>
-              {loans.filter(l=>!l.paid).length>0 && (
-                <div style={{...s.card,marginBottom:14}}>
-                  <div style={s.cardTitle}>Préstamos por cobrar</div>
-                  {loans.filter(l=>!l.paid).map(l=>{
-                    const st=loanStatus(l);
-                    return (
-                      <div key={l.id} style={s.txRow}>
-                        <div style={{...s.txIcon("loan")}}>💸</div>
-                        <div style={{flex:1}}>
-                          <div style={s.txCat}>{l.debtor}</div>
-                          <div style={s.txNote}>Prestaste {fmtCOP(l.amount)} · te deben {fmtCOP(st.totalOut)}</div>
-                        </div>
-                        <div style={{textAlign:"right"}}>
-                          <div style={{color:P.income,fontWeight:700,fontSize:13}}>{fmtCOP(st.received)}</div>
-                          <div style={s.txDate}>recibido · {st.pct}%</div>
-                        </div>
+          {/* ── TRANSACTIONS ── agrupados por día ── */}
+          {view==="transactions" && (()=>{
+            const groups = [];
+            filtered.forEach(t=>{
+              const g = groups[groups.length-1];
+              if(g && g.date===t.date) g.items.push(t); else groups.push({date:t.date, items:[t]});
+            });
+            return (
+              <div>
+                <label style={{display:"flex",alignItems:"center",gap:10,height:46,padding:"0 14px",background:"rgba(255,255,255,0.04)",border:`1.5px solid ${P.cardBorder}`,borderRadius:14,color:P.textSub,marginBottom:12,boxSizing:"border-box"}}>
+                  <Icon name="search" size={18}/>
+                  <input value={txSearch} onChange={e=>setTxSearch(e.target.value)} placeholder="Buscar por nota, categoría o cuenta" aria-label="Buscar movimientos"
+                    style={{flex:1,minWidth:0,background:"transparent",border:"none",outline:"none",color:P.text,fontSize:14}}/>
+                  {txSearch && <button onClick={()=>setTxSearch("")} aria-label="Limpiar búsqueda" style={{background:"none",border:"none",color:P.textSub,cursor:"pointer",fontSize:14,padding:4}}>✕</button>}
+                </label>
+                <div className="hide-sb" style={{...s.filterRow,overflowX:"auto",marginBottom:12}}>
+                  {[["all","Todos"],["income","Ingresos"],["expense","Gastos"],["transfer","Traslados"]].map(([v,l])=>(
+                    <button key={v} onClick={()=>setFilter(v)} style={{...s.filterBtn(filterType===v),padding:"8px 14px",flexShrink:0}}>{l}</button>
+                  ))}
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:10,marginBottom:6}}>
+                  <div style={{background:P.card,border:`1px solid ${P.cardBorder}`,borderRadius:14,padding:"10px 12px"}}>
+                    <div style={{fontSize:11,color:P.textSub}}>Entró en {monthKeys.label}</div>
+                    <div style={{fontSize:15,fontWeight:700,color:P.income,fontVariantNumeric:"tabular-nums"}}>+{fmtCOP(monthIncome)}</div>
+                  </div>
+                  <div style={{background:P.card,border:`1px solid ${P.cardBorder}`,borderRadius:14,padding:"10px 12px"}}>
+                    <div style={{fontSize:11,color:P.textSub}}>Salió en {monthKeys.label}</div>
+                    <div style={{fontSize:15,fontWeight:700,color:P.expense,fontVariantNumeric:"tabular-nums"}}>−{fmtCOP(monthExpense)}</div>
+                  </div>
+                </div>
+                {groups.length===0 ? <div style={s.empty}>{txSearch?"Nada coincide con tu búsqueda":"Sin movimientos"}</div> : groups.map(g=>{
+                  const lbl = dayLabel(g.date);
+                  // Neto del día: los traslados no cuentan (no son ingreso ni gasto)
+                  const net = g.items.reduce((acc,t)=>acc+(t.kind==="transfer"?0:t.type==="income"?t.amount:-t.amount),0);
+                  const onlyTransfers = g.items.every(t=>t.kind==="transfer");
+                  return (
+                    <div key={g.date}>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",padding:"12px 4px 8px"}}>
+                        <span style={{fontSize:13,fontWeight:700,color:P.text}}>{lbl.head} <span style={{color:P.textSub,fontWeight:500}}>· {lbl.sub}</span></span>
+                        {!onlyTransfers && <span style={{fontSize:12,fontWeight:700,color:net>=0?P.income:P.expense,fontVariantNumeric:"tabular-nums"}}>{net>=0?"+":"−"}{fmtCOP(Math.abs(net))}</span>}
                       </div>
-                    );
-                  })}
-                  <button onClick={()=>{setView("credit");setCreditTab("loans");setSubView(null);}} style={{...s.accentBtn,width:"100%",marginTop:10,padding:"9px"}}>Gestionar préstamos →</button>
-                </div>
-              )}
-              {filtered.length===0?<div style={s.empty}>Sin movimientos</div>:filtered.map(t=>(
-                <div key={t.id} style={s.txCard}>
-                  <div style={s.txIcon(t.type)}>{t.type==="income"?"▲":"▼"}</div>
-                  <div style={{flex:1}}>
-                    <div style={s.txCat}>{t.category}</div>
-                    <div style={{display:"flex",alignItems:"center",gap:6,marginTop:2,flexWrap:"wrap"}}>
-                      {t.method&&<span style={{fontSize:11,padding:"2px 7px",borderRadius:20,background:"rgba(129,140,248,0.1)",color:P.accent,fontWeight:600}}>{METHOD_ICONS[t.method]||"💱"} {t.method}</span>}
-                      <span style={s.txNote}>{t.note||"—"} · {fmtDate(t.date)}</span>
+                      <div style={{background:P.card,border:`1px solid ${P.cardBorder}`,borderRadius:16,padding:"0 14px"}}>
+                        {g.items.map((t,i)=>renderMove(t,{actions:true,last:i===g.items.length-1}))}
+                      </div>
                     </div>
-                  </div>
-                  <div style={{textAlign:"right",display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4}}>
-                    <div style={{color:t.type==="income"?P.income:P.expense,fontWeight:700,fontSize:14}}>{t.type==="income"?"+":"-"}{fmtCOP(t.amount)}</div>
-                    <div style={{display:"flex",gap:4}}>
-                      {t.type==="expense"&&<button onClick={()=>getAiSuggestion(t)} style={{background:"rgba(129,140,248,0.1)",border:"none",color:P.accent,borderRadius:8,padding:"3px 7px",cursor:"pointer",fontSize:11}}>✨</button>}
-                      {delConfirm===t.id?(
-                        <div style={{display:"flex",gap:6}}>
-                          <button onClick={()=>{if(t.accountId!=null)adjustAccount(t.accountId,t.type==="income"?-t.amount:t.amount);setTransactions(p=>p.filter(x=>x.id!==t.id));setDelConfirm(null);}} style={s.delConfirm}>Sí</button>
-                          <button onClick={()=>setDelConfirm(null)} style={s.delCancel}>No</button>
-                        </div>
-                      ):<button onClick={()=>setDelConfirm(t.id)} style={s.delBtn}>✕</button>}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+                  );
+                })}
+              </div>
+            );
+          })()}
 
           {/* ── STATS ── */}
           {view==="stats" && (
@@ -1632,7 +1820,7 @@ export default function App() {
                   <ResponsiveContainer width="100%" height={180}>
                     <BarChart data={statsMonthlyData} barGap={4}>
                       <XAxis dataKey="month" tick={{fill:P.textSub,fontSize:11}} axisLine={false} tickLine={false}/>
-                      <YAxis tick={{fill:P.textSub,fontSize:10}} axisLine={false} tickLine={false} tickFormatter={v=>`${(v/1000000).toFixed(1)}M`}/>
+                      <YAxis tick={{fill:P.textSub,fontSize:10}} axisLine={false} tickLine={false} tickFormatter={fmtAxis}/>
                       <Tooltip formatter={v=>fmtCOP(v)} contentStyle={{background:P.card,border:`1px solid ${P.cardBorder}`,borderRadius:8,color:P.text}}/>
                       <Bar dataKey="income" fill={P.income} radius={[4,4,0,0]} name="Ingresos"/>
                       <Bar dataKey="expense" fill={P.expense} radius={[4,4,0,0]} name="Gastos"/>
@@ -1648,7 +1836,7 @@ export default function App() {
                   <ResponsiveContainer width="100%" height={140}>
                     <LineChart data={statsMonthlyData.map((d,i,arr)=>({...d,balance:arr.slice(0,i+1).reduce((s,x)=>s+x.income-x.expense,0)}))}>
                       <XAxis dataKey="month" tick={{fill:P.textSub,fontSize:11}} axisLine={false} tickLine={false}/>
-                      <YAxis tick={{fill:P.textSub,fontSize:10}} axisLine={false} tickLine={false} tickFormatter={v=>`${(v/1000000).toFixed(1)}M`}/>
+                      <YAxis tick={{fill:P.textSub,fontSize:10}} axisLine={false} tickLine={false} tickFormatter={fmtAxis}/>
                       <Tooltip formatter={v=>fmtCOP(v)} contentStyle={{background:P.card,border:`1px solid ${P.cardBorder}`,borderRadius:8,color:P.text}}/>
                       <Line type="monotone" dataKey="balance" stroke={P.accent} strokeWidth={2.5} dot={{fill:P.accent,r:4}} name="Balance"/>
                     </LineChart>
@@ -1665,6 +1853,7 @@ export default function App() {
                 {id:"goals",icon:"🎯",label:"Metas de ahorro",sub:"Objetivos con progreso visual"},
                 {id:"budget",icon:"📊",label:"Presupuesto mensual",sub:"Límites por categoría"},
                 {id:"categories",icon:"🏷️",label:"Categorías",sub:"Personaliza tus categorías"},
+                {id:"recurring",icon:"🔁",label:"Recurrentes",sub:"Gastos e ingresos que se repiten cada mes"},
                 {id:"exportimport",icon:"💾",label:"Exportar / Importar",sub:"Backup y transferencia entre equipos"},
               ].map(item=>(
                 <button key={item.id} onClick={()=>setSubView(item.id)} style={s.menuItem}>
@@ -1689,9 +1878,77 @@ export default function App() {
                 <div style={{fontSize:12,color:P.textSub,marginBottom:2}}>🇨🇴 Colombia</div>
                 <div style={{fontSize:12,color:P.textSub,marginBottom:20}}>Cod: 440</div>
                 <div style={{width:40,height:1,background:P.cardBorder,margin:"0 auto 16px"}}/>
-                <div style={{fontSize:11,color:P.muted}}>Versión 1.1.0-beta · 2026</div>
+                <div style={{fontSize:11,color:P.muted}}>Versión 1.5.0 · 2026</div>
                 <div style={{display:"inline-block",marginTop:8,fontSize:10,fontWeight:700,letterSpacing:0.8,textTransform:"uppercase",color:P.loan,background:"rgba(251,191,36,0.12)",border:"1px solid rgba(251,191,36,0.3)",borderRadius:20,padding:"3px 10px"}}>🚧 En desarrollo</div>
               </div>
+            </div>
+          )}
+
+          {/* RECURRING TAB */}
+          {view==="settings" && subView==="recurring" && (                <div>
+              <form onSubmit={e=>{
+                e.preventDefault();
+                if(!recurForm.amount||!recurForm.category)return;
+                setRecurringTx(prev=>[...prev,{...recurForm,amount:parseFloat(recurForm.amount),id:nextId,lastMonth:null}]);
+                setNextId(n=>n+1);
+                setRecurForm({type:"expense",amount:"",category:"",note:"",dayOfMonth:"1",account:""});
+              }} style={{...s.card,marginBottom:16}}>
+                <div style={s.cardTitle}>Nuevo gasto / ingreso recurrente</div>
+                <div style={s.toggleRow}>
+                  {["expense","income"].map(t=>(
+                    <button key={t} type="button" onClick={()=>setRecurForm(f=>({...f,type:t,category:""}))} style={s.toggleBtn(recurForm.type===t,t)}>
+                      {t==="income"?"▲ Ingreso":"▼ Gasto"}
+                    </button>
+                  ))}
+                </div>
+                <div style={s.fieldGroup}><label style={s.label}>Monto (COP)</label><input style={s.input} type="text" inputMode="numeric" placeholder="0" value={fmtMiles(recurForm.amount)} onChange={e=>setRecurForm(f=>({...f,amount:onlyDigits(e.target.value)}))} required/></div>
+                <div style={s.fieldGroup}><label style={s.label}>Categoría</label>
+                  <CustomSelect
+                    value={recurForm.category}
+                    onChange={e=>setRecurForm(f=>({...f,category:e.target.value}))}
+                    options={(recurForm.type==="expense"?expCats:incCats)}
+                    placeholder="Seleccionar..."
+                    P={P}
+                  />
+                </div>
+                <div style={s.fieldGroup}><label style={s.label}>Nota</label><input style={s.input} placeholder="Netflix, Arriendo..." value={recurForm.note} onChange={e=>setRecurForm(f=>({...f,note:e.target.value}))}/></div>
+                {accounts.length>0 && (
+                  <div style={s.fieldGroup}><label style={s.label}>Cuenta ({recurForm.type==="income"?"entra a":"sale de"})</label>
+                    <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+                      {accounts.map(a=>(
+                        <button key={a.id} type="button" onClick={()=>setRecurForm(f=>({...f,account:f.account===a.id?"":a.id}))}
+                          style={{padding:"7px 12px",borderRadius:20,border:`1.5px solid ${recurForm.account===a.id?P.accent:P.cardBorder}`,background:recurForm.account===a.id?"rgba(129,140,248,0.13)":"transparent",color:recurForm.account===a.id?P.accent:P.textSub,fontSize:12,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",gap:6}}>
+                          <span style={{width:8,height:8,borderRadius:"50%",background:a.color||P.accent}}/>{a.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <div style={s.fieldGroup}><label style={s.label}>Día del mes que se aplica</label><input style={s.input} type="number" min="1" max="28" value={recurForm.dayOfMonth} onChange={e=>setRecurForm(f=>({...f,dayOfMonth:e.target.value}))}/></div>
+                <button type="submit" style={s.submitBtn("expense")}>Agregar recurrente</button>
+              </form>
+
+              <button onClick={applyRecurring} style={{...s.accentBtn,width:"100%",marginBottom:14,padding:"12px"}}>🔁 Aplicar recurrentes de este mes</button>
+
+              {recurringTx.length===0?<div style={s.empty}>Sin gastos recurrentes</div>:recurringTx.map(r=>{
+                const thisMonth=`${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,"0")}`;
+                const applied=r.lastMonth===thisMonth;
+                return(
+                  <div key={r.id} style={{...s.card,borderLeft:`4px solid ${r.type==="income"?P.income:P.expense}`}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                      <div>
+                        <div style={{fontWeight:600,color:P.text,fontSize:14}}>{r.note||r.category}</div>
+                        <div style={{fontSize:12,color:P.textSub}}>Día {r.dayOfMonth} · {r.category}</div>
+                      </div>
+                      <div style={{textAlign:"right"}}>
+                        <div style={{color:r.type==="income"?P.income:P.expense,fontWeight:700}}>{r.type==="income"?"+":"-"}{fmtCOP(r.amount)}</div>
+                        <div style={{fontSize:11,color:applied?P.income:P.muted}}>{applied?"✓ Aplicado este mes":"Pendiente"}</div>
+                      </div>
+                    </div>
+                    <button onClick={()=>setRecurringTx(p=>p.filter(x=>x.id!==r.id))} style={{marginTop:10,width:"100%",padding:"7px",borderRadius:10,background:"rgba(248,113,113,0.08)",border:"none",color:P.expense,fontSize:12,cursor:"pointer"}}>Eliminar recurrente</button>
+                  </div>
+                );
+              })}
             </div>
           )}
 
@@ -1706,7 +1963,7 @@ export default function App() {
                   const payload = {
                     version:"1.0.0",
                     exportDate: new Date().toISOString(),
-                    transactions, cards, loans, debts, recurringTx, creditPlans,
+                    transactions, cards, loans, debts, recurringTx, creditPlans, transfers,
                     goals, budgets, expCats, incCats, nextId,
                   };
                   saveFile(
@@ -1755,20 +2012,26 @@ export default function App() {
                         const data = JSON.parse(ev.target.result);
                         if(!data.version||!data.transactions) throw new Error("Formato inválido");
                         if(!window.confirm("¿Importar y reemplazar todos los datos actuales?")) return;
-                        if(data.transactions)  setTransactions(data.transactions);
-                        if(data.cards)         setCards(data.cards);
-                        if(data.loans)         setLoans(data.loans);
-                        if(data.debts)         setDebts(data.debts);
-                        if(data.recurringTx)   setRecurringTx(data.recurringTx);
-                        if(data.creditPlans)   setCreditPlans(data.creditPlans);
-                        if(data.goals)         setGoals(data.goals);
-                        if(data.budgets)       setBudgets(data.budgets);
-                        if(data.expCats)       setExpCats(data.expCats);
-                        if(data.incCats)       setIncCats(data.incCats);
-                        if(data.nextId)        setNextId(data.nextId);
+                        // Reemplazo total: lo que falte en el archivo (p. ej. respaldos
+                        // viejos sin "debts") queda vacío en vez de mezclarse con lo actual.
+                        setTransactions(data.transactions);
+                        setCards(data.cards||[]);
+                        setLoans(data.loans||[]);
+                        setDebts(data.debts||[]);
+                        setTransfers(data.transfers||[]);
+                        setRecurringTx(data.recurringTx||[]);
+                        setCreditPlans(data.creditPlans||[]);
+                        setGoals(data.goals||[]);
+                        setBudgets(data.budgets||{});
+                        setExpCats(data.expCats||DEFAULT_EXPENSE_CATS);
+                        setIncCats(data.incCats||DEFAULT_INCOME_CATS);
+                        // nunca por debajo del mayor id importado, o los nuevos registros chocarían
+                        const maxId = ["transactions","cards","loans","debts","transfers","recurringTx","creditPlans","goals"]
+                          .flatMap(k=>Array.isArray(data[k])?data[k]:[]).reduce((m,x)=>Math.max(m,Number(x.id)||0),0);
+                        setNextId(Math.max(data.nextId||1, maxId+1));
                         alert("✅ Datos importados correctamente");
                         setSubView(null);
-                      } catch(err){
+                      } catch {
                         alert("❌ Archivo inválido. Asegúrate de usar un JSON exportado desde esta app.");
                       }
                     };
@@ -1843,7 +2106,7 @@ export default function App() {
                 <div style={{fontSize:12,color:P.textSub,marginBottom:12}}>Deja en 0 para no tener límite</div>
               </div>
               {expCats.map(cat=>{
-                const spent=catSpend[cat]||0;
+                const spent=monthCatSpend[cat]||0;   // el límite es mensual: comparar con lo del mes, no con el histórico
                 const limit=budgets[cat]||0;
                 const pct=limit>0?Math.min(100,Math.round((spent/limit)*100)):0;
                 const over=limit>0&&spent>limit;
@@ -1853,7 +2116,7 @@ export default function App() {
                       <span style={{fontWeight:600,color:P.text,fontSize:14}}>{cat}</span>
                       {limit>0&&<span style={{fontSize:12,color:over?P.expense:P.accent}}>{over?"⚠️ Excedido":pct+"%"}</span>}
                     </div>
-                    <div style={{fontSize:12,color:P.textSub,marginBottom:8}}>Gastado: {fmtCOP(spent)}{limit>0?` / límite: ${fmtCOP(limit)}`:""}</div>
+                    <div style={{fontSize:12,color:P.textSub,marginBottom:8}}>Gastado en {monthKeys.label}: {fmtCOP(spent)}{limit>0?` / límite: ${fmtCOP(limit)}`:""}</div>
                     {limit>0&&<div style={{...s.progressBg,marginBottom:10}}><div style={{...s.progressBar,width:`${pct}%`,background:over?`linear-gradient(90deg,#dc2626,${P.expense})`:`linear-gradient(90deg,#059669,${P.income})`}}/></div>}
                     <div style={{display:"flex",gap:8}}>
                       <input type="text" inputMode="numeric" placeholder="Límite mensual..." defaultValue={limit?fmtMiles(limit):""} onChange={e=>{e.target.value=fmtMiles(e.target.value);}} style={{...s.input,flex:1,padding:"8px 10px",fontSize:13}} id={`bgt-${cat}`}/>
@@ -1901,10 +2164,17 @@ export default function App() {
           {/* ── CREDIT ── */}
           {view==="credit" && (
             <div>
-              {accHead("cards","👛","Cuentas y tarjetas")}
+              {!subView && (
+                <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:4,padding:4,background:P.card,border:`1px solid ${P.cardBorder}`,borderRadius:14,marginBottom:14}}>
+                  {[["cuentas","Cuentas"],["prestamos","Préstamos"]].map(([k,l])=>(
+                    <button key={k} onClick={()=>setAcctTab(k)}
+                      style={{height:40,border:"none",borderRadius:10,background:acctTab===k?"rgba(129,140,248,0.16)":"transparent",color:acctTab===k?P.accent:P.textSub,fontWeight:acctTab===k?700:600,fontSize:14,cursor:"pointer"}}>{l}</button>
+                  ))}
+                </div>
+              )}
 
               {/* CARDS TAB */}
-              {creditTab==="cards" && (
+              {!subView && acctTab==="cuentas" && (
                 <div>
                   {(showCardForm || editCard!==null) && (
                   <form onSubmit={e=>{
@@ -1952,9 +2222,27 @@ export default function App() {
                   </form>
                   )}
 
+                  {/* Patrimonio */}
+                  <div style={s.card}>
+                    <div style={{fontSize:11,color:P.textSub,letterSpacing:0.5,textTransform:"uppercase"}}>Patrimonio total</div>
+                    <div style={{fontSize:28,fontWeight:800,color:patrimonio>=0?P.income:P.expense,margin:"4px 0 10px",fontVariantNumeric:"tabular-nums"}}>{fmtCOP(patrimonio)}</div>
+                    <div style={{display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:8}}>
+                      {[["Líquido",liquidTotal,P.text],["Te deben",porCobrar,P.loan],["Debes",porPagar,P.expense]].map(([l,v,c])=>(
+                        <div key={l} style={{background:"rgba(255,255,255,0.03)",borderRadius:10,padding:"8px 10px",minWidth:0}}>
+                          <div style={{fontSize:10,color:P.textSub}}>{l}</div>
+                          <div style={{fontSize:12,fontWeight:700,color:c,fontVariantNumeric:"tabular-nums",letterSpacing:-0.2,overflowWrap:"anywhere"}}>{fmtCOP(v)}</div>
+                        </div>
+                      ))}
+                    </div>
+                    {creditDebt>0 && <div style={{fontSize:11,color:P.textSub,marginTop:10}}>Además debes {fmtCOP(creditDebt)} en tarjetas; se descuenta al pagar cada cuota.</div>}
+                  </div>
+
                   {/* Grupo: Cuentas de dinero */}
                   <div style={s.card}>
-                    <div style={s.cardTitle}>Cuentas de dinero</div>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+                      <span style={{...s.cardTitle,marginBottom:0}}>Cuentas de dinero</span>
+                      {accounts.length>=2 && <button onClick={()=>startAdd("transfer")} style={{border:"1px solid rgba(129,140,248,0.35)",background:"rgba(129,140,248,0.1)",color:P.accent,borderRadius:10,padding:"6px 10px",fontSize:12,fontWeight:700,cursor:"pointer"}}>⇄ Mover</button>}
+                    </div>
                     {accounts.length===0 ? <div style={{fontSize:12,color:P.textSub,marginBottom:12}}>Aún no tienes cuentas de dinero.</div> :
                       accounts.map(a=>(
                         <button key={a.id} onClick={()=>{setEditCard(a.id);setShowCardForm(true);setCardForm({bank:a.bank||"",name:a.name,type:a.type,limit:String(a.limit||""),used:String(a.used||""),color:a.color||"#818cf8",logo:a.logo||""});window.scrollTo(0,0);}}
@@ -2001,6 +2289,17 @@ export default function App() {
                     }
                     <button onClick={()=>{setEditCard(null);setCardForm({bank:"",name:"",type:"credito",limit:"",used:"",color:"#818cf8",logo:""});setShowCardForm(true);window.scrollTo(0,0);}}
                       style={{width:"100%",marginTop:12,border:`1.5px dashed ${P.cardBorder}`,background:"transparent",color:P.accent,borderRadius:14,padding:"11px",fontSize:13,fontWeight:600,cursor:"pointer"}}>＋ Agregar tarjeta</button>
+                    {creditOnly.length>0 && (
+                      <button onClick={()=>setSubView("health")}
+                        style={{width:"100%",marginTop:12,display:"flex",alignItems:"center",gap:12,background:`${scoreColor}10`,border:`1px solid ${scoreColor}40`,borderRadius:14,padding:"12px 14px",cursor:"pointer",textAlign:"left",color:scoreColor}}>
+                        <Icon name="shield"/>
+                        <span style={{flex:1}}>
+                          <span style={{display:"block",fontSize:13,fontWeight:700,color:P.text}}>Salud del crédito: {creditScore}</span>
+                          <span style={{display:"block",fontSize:11.5,color:P.textSub}}>Usas el {utilPct}% de tu cupo · score y consejos</span>
+                        </span>
+                        <span style={{color:P.textSub,fontSize:18}}>›</span>
+                      </button>
+                    )}
                   </div>
 
                   {/* Compras a crédito — cuotas pendientes */}
@@ -2022,7 +2321,7 @@ export default function App() {
                                 <button onClick={()=>{if(window.confirm(`¿Cancelar esta compra a crédito? Se libera el cupo de las cuotas sin pagar (${fmtCOP(Math.max(0,p.total-p.cuotaAmount*p.cuotasPaid))}).`)) deleteCreditPlan(p);}} title="Cancelar compra" style={{background:"rgba(248,113,113,0.1)",border:"none",color:P.expense,borderRadius:8,padding:"3px 8px",cursor:"pointer",fontSize:12}}>✕</button>
                               </div>
                             </div>
-                            <div style={{fontSize:11,color:P.textSub,marginBottom:6}}>{card?`💳 ${card.name} · `:""}Total {fmtCOP(p.total)} · pagado {fmtCOP(p.cuotaAmount*p.cuotasPaid)}</div>
+                            <div style={{fontSize:11,color:P.textSub,marginBottom:6}}>{card?`💳 ${card.name} · `:""}Total {fmtCOP(p.total)} · pagado {fmtCOP(paidAmt)}</div>
                             <div style={{...s.progressBg,marginBottom:10}}><div style={{...s.progressBar,width:`${Math.round((p.cuotasPaid/p.cuotas)*100)}%`,background:`linear-gradient(90deg,#6d28d9,${P.accent})`}}/></div>
                             {accounts.length===0 ? (
                               <div style={{fontSize:11,color:P.expense}}>Crea una cuenta (Efectivo/Débito) para poder pagar la cuota.</div>
@@ -2066,12 +2365,11 @@ export default function App() {
                 </div>
               )}
 
-              {accHead("score","📊","Score de crédito")}
               {/* SCORE TAB */}
-              {creditTab==="score" && (
+              {subView==="health" && (
                 <div>
-                  {cards.length===0?(
-                    <div style={s.empty}>Agrega tus tarjetas primero</div>
+                  {creditOnly.length===0?(
+                    <div style={s.empty}>Agrega una tarjeta de crédito para ver tu score</div>
                   ):(
                     <>
                       {/* Semáforo */}
@@ -2122,9 +2420,8 @@ export default function App() {
                 </div>
               )}
 
-              {accHead("tips","🤖","Consejos IA")}
               {/* TIPS IA TAB */}
-              {creditTab==="tips" && (
+              {subView==="health" && (
                 <div>
                   <div style={s.card}>
                     <div style={s.cardTitle}>Análisis IA de tu vida crediticia</div>
@@ -2170,79 +2467,29 @@ export default function App() {
                 </div>
               )}
 
-              {accHead("recurring","🔁","Recurrentes")}
-              {/* RECURRING TAB */}
-              {creditTab==="recurring" && (                <div>
-                  <form onSubmit={e=>{
-                    e.preventDefault();
-                    if(!recurForm.amount||!recurForm.category)return;
-                    setRecurringTx(prev=>[...prev,{...recurForm,amount:parseFloat(recurForm.amount),id:nextId,lastMonth:null}]);
-                    setNextId(n=>n+1);
-                    setRecurForm({type:"expense",amount:"",category:"",note:"",dayOfMonth:"1",account:""});
-                  }} style={{...s.card,marginBottom:16}}>
-                    <div style={s.cardTitle}>Nuevo gasto / ingreso recurrente</div>
-                    <div style={s.toggleRow}>
-                      {["expense","income"].map(t=>(
-                        <button key={t} type="button" onClick={()=>setRecurForm(f=>({...f,type:t,category:""}))} style={s.toggleBtn(recurForm.type===t,t)}>
-                          {t==="income"?"▲ Ingreso":"▼ Gasto"}
-                        </button>
-                      ))}
-                    </div>
-                    <div style={s.fieldGroup}><label style={s.label}>Monto (COP)</label><input style={s.input} type="text" inputMode="numeric" placeholder="0" value={fmtMiles(recurForm.amount)} onChange={e=>setRecurForm(f=>({...f,amount:onlyDigits(e.target.value)}))} required/></div>
-                    <div style={s.fieldGroup}><label style={s.label}>Categoría</label>
-                      <CustomSelect
-                        value={recurForm.category}
-                        onChange={e=>setRecurForm(f=>({...f,category:e.target.value}))}
-                        options={(recurForm.type==="expense"?expCats:incCats)}
-                        placeholder="Seleccionar..."
-                        P={P}
-                      />
-                    </div>
-                    <div style={s.fieldGroup}><label style={s.label}>Nota</label><input style={s.input} placeholder="Netflix, Arriendo..." value={recurForm.note} onChange={e=>setRecurForm(f=>({...f,note:e.target.value}))}/></div>
-                    {accounts.length>0 && (
-                      <div style={s.fieldGroup}><label style={s.label}>Cuenta ({recurForm.type==="income"?"entra a":"sale de"})</label>
-                        <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
-                          {accounts.map(a=>(
-                            <button key={a.id} type="button" onClick={()=>setRecurForm(f=>({...f,account:f.account===a.id?"":a.id}))}
-                              style={{padding:"7px 12px",borderRadius:20,border:`1.5px solid ${recurForm.account===a.id?P.accent:P.cardBorder}`,background:recurForm.account===a.id?"rgba(129,140,248,0.13)":"transparent",color:recurForm.account===a.id?P.accent:P.textSub,fontSize:12,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",gap:6}}>
-                              <span style={{width:8,height:8,borderRadius:"50%",background:a.color||P.accent}}/>{a.name}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    <div style={s.fieldGroup}><label style={s.label}>Día del mes que se aplica</label><input style={s.input} type="number" min="1" max="28" value={recurForm.dayOfMonth} onChange={e=>setRecurForm(f=>({...f,dayOfMonth:e.target.value}))}/></div>
-                    <button type="submit" style={s.submitBtn("expense")}>Agregar recurrente</button>
-                  </form>
+              {!subView && acctTab==="prestamos" && (()=>{
+                const actL = loans.filter(l=>!l.paid), actD = debts.filter(d=>!d.paid);
+                const lendOut = actL.reduce((a,l)=>a+loanStatus(l).totalOut,0);
+                const oweOut  = actD.reduce((a,d)=>a+debtStatus(d).totalOut,0);
+                const tile = (k,label,amt,n,c,rgb) => (
+                  <button key={k} onClick={()=>setLoanSide(k)}
+                    style={{textAlign:"left",background:loanSide===k?`rgba(${rgb},0.08)`:P.card,border:loanSide===k?`1.5px solid ${c}`:`1px solid ${P.cardBorder}`,borderRadius:16,padding:14,cursor:"pointer"}}>
+                    <span style={{display:"block",fontSize:11,fontWeight:600,color:c,letterSpacing:0.6,textTransform:"uppercase"}}>{label} · {n}</span>
+                    <span style={{display:"block",fontSize:20,fontWeight:800,color:P.text,marginTop:6,fontVariantNumeric:"tabular-nums"}}>{fmtCOP(amt)}</span>
+                  </button>
+                );
+                return (
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:10,marginBottom:14}}>
+                    {tile("lend","Me deben",lendOut,actL.length,P.loan,"251,191,36")}
+                    {tile("owe","Debo",oweOut,actD.length,P.expense,"248,113,113")}
+                  </div>
+                );
+              })()}
 
-                  <button onClick={applyRecurring} style={{...s.accentBtn,width:"100%",marginBottom:14,padding:"12px"}}>🔁 Aplicar recurrentes de este mes</button>
-
-                  {recurringTx.length===0?<div style={s.empty}>Sin gastos recurrentes</div>:recurringTx.map(r=>{
-                    const thisMonth=`${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,"0")}`;
-                    const applied=r.lastMonth===thisMonth;
-                    return(
-                      <div key={r.id} style={{...s.card,borderLeft:`4px solid ${r.type==="income"?P.income:P.expense}`}}>
-                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                          <div>
-                            <div style={{fontWeight:600,color:P.text,fontSize:14}}>{r.note||r.category}</div>
-                            <div style={{fontSize:12,color:P.textSub}}>Día {r.dayOfMonth} · {r.category}</div>
-                          </div>
-                          <div style={{textAlign:"right"}}>
-                            <div style={{color:r.type==="income"?P.income:P.expense,fontWeight:700}}>{r.type==="income"?"+":"-"}{fmtCOP(r.amount)}</div>
-                            <div style={{fontSize:11,color:applied?P.income:P.muted}}>{applied?"✓ Aplicado este mes":"Pendiente"}</div>
-                          </div>
-                        </div>
-                        <button onClick={()=>setRecurringTx(p=>p.filter(x=>x.id!==r.id))} style={{marginTop:10,width:"100%",padding:"7px",borderRadius:10,background:"rgba(248,113,113,0.08)",border:"none",color:P.expense,fontSize:12,cursor:"pointer"}}>Eliminar recurrente</button>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
-              {accHead("loans","💸","Préstamos")}
-              {/* LOANS SUB-TAB */}
-              {creditTab==="loans" && (
+              {/* PRÉSTAMOS: me deben */}
+              {!subView && acctTab==="prestamos" && loanSide==="lend" && (
                 <div>
+                  {(showLoanForm || editLoan!==null) && (
                   <form onSubmit={addLoan} style={{...s.card,marginBottom:16}}>
                     <div style={s.cardTitle}>{editLoan!==null?"Editar préstamo":"Nuevo préstamo"}</div>
                     <div style={s.fieldGroup}><label style={s.label}>¿A quién le presté?</label>
@@ -2315,137 +2562,145 @@ export default function App() {
                       );
                     })()}
                     <button type="submit" style={{...s.submitBtn("income"),background:"linear-gradient(135deg,#b45309,#fbbf24)"}}>{editLoan!==null?"Guardar cambios":"Registrar préstamo"}</button>
-                    {editLoan!==null&&<button type="button" onClick={()=>{setEditLoan(null);setLoanForm({debtor:"",amount:"",interest:"",interestType:"simple",months:"",date:today(),note:"",account:"",useSplit:false,splits:[]});}} style={{...s.submitBtn("expense"),marginTop:8,background:"transparent",border:`1px solid ${P.cardBorder}`,color:P.textSub}}>Cancelar</button>}
+                    <button type="button" onClick={()=>{setShowLoanForm(false);setEditLoan(null);setLoanForm({debtor:"",amount:"",interest:"",interestType:"simple",months:"",date:today(),note:"",account:"",useSplit:false,splits:[]});}} style={{...s.submitBtn("expense"),marginTop:8,background:"transparent",border:`1px solid ${P.cardBorder}`,color:P.textSub}}>Cancelar</button>
                   </form>
-                  {loans.length===0?<div style={s.empty}>Sin préstamos registrados</div>:loans.map(l=>{
-                    const {total,interest,monthly,schedule}=calcLoan(l);
-                    const st=loanStatus(l);
-                    const recvAcct=(receiveAcct[l.id]!==undefined?receiveAcct[l.id]:l.account);
-                    const isExpanded=expandedLoan===l.id;
-                    return(
-                      <div key={l.id} style={{...s.card,borderColor:l.paid?"#2a3a2a":P.cardBorder,opacity:l.paid?0.65:1}}>
-                        <div style={s.cardRowSb}>
-                          <span style={{fontWeight:700,fontSize:16,color:P.text}}>{l.debtor}</span>
-                          <span style={{fontSize:12,padding:"3px 10px",borderRadius:20,background:l.paid?"rgba(52,211,153,0.1)":"rgba(251,191,36,0.1)",color:l.paid?P.income:P.loan,fontWeight:600}}>{l.paid?"Pagado":"Pendiente"}</span>
-                        </div>
-                        {l.note&&<div style={{fontSize:12,color:P.textSub,marginBottom:10}}>{l.note}</div>}
-                        <div style={{background:"rgba(251,191,36,0.06)",border:"1px solid rgba(251,191,36,0.15)",borderRadius:12,padding:"12px 14px",marginBottom:12}}>
-                          <div style={{fontSize:11,color:P.loan,fontWeight:700,letterSpacing:0.8,textTransform:"uppercase",marginBottom:10}}>Resumen financiero</div>
-                          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"10px 0"}}>
-                            {[["💵 Capital",fmtCOP(l.amount),P.text],["📅 Plazo",`${l.months} mes(es)`,P.text],["📈 Tasa",`${l.interest}% ${l.interestType==="compound"?"comp.":"simple"}`,P.text],["💰 Cuota/mes",fmtCOP(monthly),P.loan],["🎁 Interés",fmtCOP(interest),P.income],["✅ Total",fmtCOP(total),P.income]].map(([lbl,val,col])=>(
-                              <div key={lbl}><div style={{fontSize:10,color:P.textSub,marginBottom:2}}>{lbl}</div><div style={{fontSize:13,fontWeight:700,color:col}}>{val}</div></div>
-                            ))}
-                          </div>
-                          <div style={{marginTop:12}}>
-                            <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:P.textSub,marginBottom:4}}>
-                              <span>Capital {Math.round((l.amount/total)*100)}%</span>
-                              <span>Interés {Math.round((interest/total)*100)}%</span>
-                            </div>
-                            <div style={{height:6,borderRadius:999,background:P.cardBorder,overflow:"hidden",display:"flex"}}>
-                              <div style={{width:`${(l.amount/total)*100}%`,background:"linear-gradient(90deg,#818cf8,#60a5fa)",borderRadius:"999px 0 0 999px"}}/>
-                              <div style={{flex:1,background:"linear-gradient(90deg,#34d399,#059669)",borderRadius:"0 999px 999px 0"}}/>
-                            </div>
-                          </div>
-                        </div>
-                        {/* Cobros / abonos recibidos (monto libre) */}
-                        <div style={{background:"rgba(52,211,153,0.05)",border:"1px solid rgba(52,211,153,0.15)",borderRadius:12,padding:"12px 14px",marginBottom:12}}>
-                          <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:6}}>
-                            <span style={{color:P.textSub}}>Recibido ({st.pct}%)</span>
-                            <span style={{color:P.income,fontWeight:700}}>{fmtCOP(st.received)} / {fmtCOP(total)}</span>
-                          </div>
-                          <div style={{...s.progressBg,marginBottom:6}}><div style={{...s.progressBar,width:`${st.pct}%`,background:`linear-gradient(90deg,#059669,${P.income})`}}/></div>
-                          <div style={{fontSize:11,color:P.textSub}}>Te deben {fmtCOP(st.totalOut)} · capital pendiente {fmtCOP(st.principalOut)}</div>
-                          {!l.paid && st.totalOut>0 && (
-                            <>
-                              <div style={{marginTop:10}}>
-                                <label style={{...s.label,marginBottom:6}}>¿Cuánto pagó?</label>
-                                <input type="text" inputMode="numeric" placeholder={fmtMiles(st.suggested)+" (una cuota)"}
-                                  value={receiveAmt[l.id]!==undefined?fmtMiles(receiveAmt[l.id]):""}
-                                  onChange={e=>setReceiveAmt(m=>({...m,[l.id]:onlyDigits(e.target.value)}))}
-                                  style={{...s.input,padding:"10px 12px",fontSize:14}}/>
-                                <div style={{fontSize:10,color:P.textSub,marginTop:4}}>Déjalo vacío para una cuota. Puede pagar más o menos; el interés se reconoce proporcional.</div>
+                  )}
+                  {(()=>{
+                    const active = loans.filter(l=>!l.paid), paid = loans.filter(l=>l.paid);
+                    const list = showPaid.lend ? [...active,...paid] : active;
+                    return (
+                      <>
+                        {active.length===0 && !showLoanForm && editLoan===null && <div style={{...s.empty,padding:"28px 0"}}>No tienes préstamos activos</div>}
+                        {list.map(l=>{
+                          const {total,interest,monthly,schedule}=calcLoan(l);
+                          const st=loanStatus(l);
+                          const recvAcct=(receiveAcct[l.id]!==undefined?receiveAcct[l.id]:l.account);
+                          const open=loanOpen[l.id];
+                          const cuotasHechas=Math.min(l.months, Math.floor((st.received+0.5)/(monthly||1)));
+                          const origen=l.account?acctName(l.account):(Array.isArray(l.splits)&&l.splits.length?"varias cuentas":null);
+                          return (
+                            <div key={l.id} style={{...s.card,opacity:l.paid?0.65:1}}>
+                              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8}}>
+                                <span style={{fontWeight:700,fontSize:16,color:P.text}}>{l.debtor}</span>
+                                <span style={{fontSize:12,padding:"3px 10px",borderRadius:20,background:l.paid?"rgba(52,211,153,0.1)":"rgba(251,191,36,0.12)",color:l.paid?P.income:P.loan,fontWeight:600,whiteSpace:"nowrap"}}>{l.paid?"Pagado":`${cuotasHechas} de ${l.months} cuota${l.months>1?"s":""}`}</span>
                               </div>
-                              {accounts.length>0 && (
-                                <div style={{display:"flex",justifyContent:"flex-end",marginTop:8}}>
-                                  <button onClick={()=>setReceiveSplitOn(m=>({...m,[l.id]:!m[l.id]}))} style={{background:"none",border:"none",color:P.accent,fontSize:11,fontWeight:600,cursor:"pointer",padding:0,textDecoration:"underline"}}>
-                                    {receiveSplitOn[l.id]?"Recibir en una sola cuenta":"Dividir entre varias cuentas"}
-                                  </button>
-                                </div>
-                              )}
-                              {receiveSplitOn[l.id] ? (
-                                <>
-                                  <PaymentSplitter total={parseFloat(onlyDigits(receiveAmt[l.id]))||st.suggested} cards={accounts} value={receiveSplits[l.id]||[]} onChange={v=>setReceiveSplits(m=>({...m,[l.id]:v}))} P={P} mode="in"/>
-                                  <button onClick={()=>{receiveLoanPayment(l, receiveAmt[l.id], receiveSplits[l.id]||[]); setReceiveSplits(m=>({...m,[l.id]:[]}));}}
-                                    style={{width:"100%",marginTop:10,padding:"10px",borderRadius:10,border:"none",background:`linear-gradient(135deg,#059669,${P.income})`,color:"#fff",fontWeight:700,fontSize:13,cursor:"pointer"}}>
-                                    + Registrar pago recibido
-                                  </button>
-                                </>
-                              ) : (
-                                <>
+                              <div style={{fontSize:12,color:P.textSub,margin:"4px 0 12px"}}>Le prestaste {fmtCOP(l.amount)} · {l.interest>0?`${l.interest}% ${l.interestType==="compound"?"compuesto":"simple"}`:"sin interés"}{origen?` · ${origen}`:""}</div>
+                              {l.note&&<div style={{fontSize:12,color:P.textSub,marginTop:-6,marginBottom:12}}>{l.note}</div>}
+                              <div style={{...s.progressBg,marginBottom:8}}><div style={{...s.progressBar,width:`${st.pct}%`,background:`linear-gradient(90deg,#059669,${P.income})`}}/></div>
+                              <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:14,fontVariantNumeric:"tabular-nums"}}>
+                                <span style={{color:P.textSub}}>Recibido {fmtCOP(st.received)}</span>
+                                <span style={{fontWeight:700,color:l.paid?P.income:P.loan}}>{l.paid?"Saldado":`Te debe ${fmtCOP(st.totalOut)}`}</span>
+                              </div>
+                              <div style={{display:"flex",gap:8}}>
+                                {!l.paid && st.totalOut>0 && (
+                                  <button onClick={()=>setLoanOpen(m=>({...m,[l.id]:m[l.id]==="pay"?null:"pay"}))}
+                                    style={{flex:1,height:44,border:open==="pay"?`1px solid ${P.income}`:"none",borderRadius:12,background:open==="pay"?"transparent":"#059669",color:open==="pay"?P.income:"#fff",fontWeight:700,fontSize:13,cursor:"pointer"}}>{open==="pay"?"Cerrar":"Registrar pago"}</button>
+                                )}
+                                <button onClick={()=>setLoanOpen(m=>({...m,[l.id]:m[l.id]==="detail"?null:"detail"}))}
+                                  style={{flex:(l.paid||st.totalOut<=0)?1:"0 0 auto",height:44,padding:"0 16px",border:`1px solid ${open==="detail"?P.accent:P.cardBorder}`,borderRadius:12,background:"transparent",color:open==="detail"?P.accent:P.textSub,fontWeight:600,fontSize:13,cursor:"pointer"}}>{open==="detail"?"Ocultar":"Detalle"}</button>
+                              </div>
+
+                              {open==="pay" && !l.paid && st.totalOut>0 && (
+                                <div style={{marginTop:14,paddingTop:14,borderTop:`1px solid ${P.cardBorder}`}}>
+                                  <label style={{...s.label,marginBottom:6}}>¿Cuánto pagó?</label>
+                                  <input type="text" inputMode="numeric" placeholder={fmtMiles(st.suggested)+" (una cuota)"}
+                                    value={receiveAmt[l.id]!==undefined?fmtMiles(receiveAmt[l.id]):""}
+                                    onChange={e=>setReceiveAmt(m=>({...m,[l.id]:onlyDigits(e.target.value)}))}
+                                    style={{...s.input,padding:"10px 12px",fontSize:14}}/>
+                                  <div style={{fontSize:10,color:P.textSub,marginTop:4}}>Déjalo vacío para una cuota. Puede pagar más o menos; el interés se reconoce proporcional.</div>
                                   {accounts.length>0 && (
-                                    <div style={{display:"flex",flexWrap:"wrap",gap:6,marginTop:10,alignItems:"center"}}>
-                                      <span style={{fontSize:11,color:P.textSub}}>Recibir en:</span>
-                                      {accounts.map(a=>(
-                                        <button key={a.id} onClick={()=>setReceiveAcct(m=>({...m,[l.id]:a.id}))}
-                                          style={{padding:"4px 9px",borderRadius:16,border:`1.5px solid ${recvAcct===a.id?P.accent:P.cardBorder}`,background:recvAcct===a.id?"rgba(129,140,248,0.13)":"transparent",color:recvAcct===a.id?P.accent:P.textSub,fontSize:11,fontWeight:600,cursor:"pointer"}}>{a.name} · {fmtCOP(a.used||0)}</button>
-                                      ))}
+                                    <div style={{display:"flex",justifyContent:"flex-end",marginTop:8}}>
+                                      <button onClick={()=>setReceiveSplitOn(m=>({...m,[l.id]:!m[l.id]}))} style={{background:"none",border:"none",color:P.accent,fontSize:11,fontWeight:600,cursor:"pointer",padding:0,textDecoration:"underline"}}>
+                                        {receiveSplitOn[l.id]?"Recibir en una sola cuenta":"Dividir entre varias cuentas"}
+                                      </button>
                                     </div>
                                   )}
-                                  <button onClick={()=>receiveLoanPayment(l, receiveAmt[l.id], recvAcct)}
-                                    style={{width:"100%",marginTop:10,padding:"10px",borderRadius:10,border:"none",background:`linear-gradient(135deg,#059669,${P.income})`,color:"#fff",fontWeight:700,fontSize:13,cursor:"pointer"}}>
-                                    + Registrar pago recibido
-                                  </button>
-                                </>
+                                  {receiveSplitOn[l.id] ? (
+                                    <>
+                                      <PaymentSplitter total={parseFloat(onlyDigits(receiveAmt[l.id]))||st.suggested} cards={accounts} value={receiveSplits[l.id]||[]} onChange={v=>setReceiveSplits(m=>({...m,[l.id]:v}))} P={P} mode="in"/>
+                                      <button onClick={()=>{receiveLoanPayment(l, receiveAmt[l.id], receiveSplits[l.id]||[]); setReceiveSplits(m=>({...m,[l.id]:[]}));}}
+                                        style={{width:"100%",marginTop:10,height:44,borderRadius:12,border:"none",background:"#059669",color:"#fff",fontWeight:700,fontSize:13,cursor:"pointer"}}>
+                                        Confirmar pago recibido
+                                      </button>
+                                    </>
+                                  ) : (
+                                    <>
+                                      {accounts.length>0 && (
+                                        <div style={{display:"flex",flexWrap:"wrap",gap:6,marginTop:10,alignItems:"center"}}>
+                                          <span style={{fontSize:11,color:P.textSub}}>Recibir en:</span>
+                                          {accounts.map(a=>(
+                                            <button key={a.id} onClick={()=>setReceiveAcct(m=>({...m,[l.id]:a.id}))}
+                                              style={{padding:"6px 10px",borderRadius:16,border:`1.5px solid ${recvAcct===a.id?P.accent:P.cardBorder}`,background:recvAcct===a.id?"rgba(129,140,248,0.13)":"transparent",color:recvAcct===a.id?P.accent:P.textSub,fontSize:11,fontWeight:600,cursor:"pointer"}}>{a.name} · {fmtCOP(a.used||0)}</button>
+                                          ))}
+                                        </div>
+                                      )}
+                                      <button onClick={()=>receiveLoanPayment(l, receiveAmt[l.id], recvAcct)}
+                                        style={{width:"100%",marginTop:10,height:44,borderRadius:12,border:"none",background:"#059669",color:"#fff",fontWeight:700,fontSize:13,cursor:"pointer"}}>
+                                        Confirmar pago recibido
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
                               )}
-                            </>
-                          )}
-                        </div>
-                        <button onClick={()=>setExpandedLoan(isExpanded?null:l.id)}
-                          style={{width:"100%",padding:"9px",borderRadius:10,border:`1px solid ${isExpanded?P.accent:P.cardBorder}`,background:isExpanded?"rgba(129,140,248,0.08)":"transparent",color:isExpanded?P.accent:P.textSub,fontWeight:600,fontSize:13,cursor:"pointer",marginBottom:isExpanded?12:0}}>
-                          {isExpanded?"▲ Ocultar tabla":"▼ Ver tabla cuota a cuota"}
-                        </button>
-                        {isExpanded&&(
-                          <div style={{overflowX:"auto"}}>
-                            <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
-                              <thead><tr style={{borderBottom:`1px solid ${P.cardBorder}`}}>
-                                {["Cuota","Interés","Total","Saldo"].map(h=>(
-                                  <th key={h} style={{padding:"6px 4px",color:P.textSub,fontWeight:600,textAlign:"right"}}>{h}</th>
-                                ))}
-                              </tr></thead>
-                              <tbody>
-                                {schedule.map((row,i)=>(
-                                  <tr key={i} style={{borderBottom:`1px solid rgba(42,42,58,0.5)`,background:i%2===0?"transparent":"rgba(255,255,255,0.015)"}}>
-                                    <td style={{padding:"6px 4px",color:P.accent,fontWeight:700,textAlign:"right"}}>#{row.cuota}</td>
-                                    <td style={{padding:"6px 4px",color:P.income,textAlign:"right"}}>{fmtCOP(row.interes)}</td>
-                                    <td style={{padding:"6px 4px",color:P.loan,textAlign:"right"}}>{fmtCOP(row.cuotaTotal)}</td>
-                                    <td style={{padding:"6px 4px",color:row.saldoPendiente===0?P.income:P.text,textAlign:"right"}}>{row.saldoPendiente===0?"✓":fmtCOP(row.saldoPendiente)}</td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                              <tfoot><tr style={{borderTop:`2px solid ${P.cardBorder}`}}>
-                                <td style={{padding:"6px 4px",color:P.textSub,fontSize:11,fontWeight:700}}>TOTAL</td>
-                                <td style={{padding:"6px 4px",color:P.income,fontWeight:700,textAlign:"right"}}>{fmtCOP(interest)}</td>
-                                <td style={{padding:"6px 4px",color:P.loan,fontWeight:700,textAlign:"right"}}>{fmtCOP(total)}</td>
-                                <td style={{padding:"6px 4px",textAlign:"right"}}>—</td>
-                              </tr></tfoot>
-                            </table>
-                          </div>
+
+                              {open==="detail" && (
+                                <div style={{marginTop:14}}>
+                                  <div style={{background:"rgba(251,191,36,0.06)",border:"1px solid rgba(251,191,36,0.15)",borderRadius:12,padding:"12px 14px",marginBottom:12}}>
+                                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"10px 0"}}>
+                                      {[["Capital",fmtCOP(l.amount),P.text],["Plazo",`${l.months} mes(es)`,P.text],["Tasa",`${l.interest}% ${l.interestType==="compound"?"comp.":"simple"}`,P.text],["Cuota/mes",fmtCOP(monthly),P.loan],["Interés",fmtCOP(interest),P.income],["Total",fmtCOP(total),P.income]].map(([lbl,val,col])=>(
+                                        <div key={lbl}><div style={{fontSize:10,color:P.textSub,marginBottom:2}}>{lbl}</div><div style={{fontSize:13,fontWeight:700,color:col}}>{val}</div></div>
+                                      ))}
+                                    </div>
+                                    <div style={{fontSize:11,color:P.textSub,marginTop:10}}>Capital pendiente {fmtCOP(st.principalOut)} · prestado el {fmtDate(l.date)}</div>
+                                  </div>
+                                  <div style={{overflowX:"auto"}}>
+                                    <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+                                      <thead><tr style={{borderBottom:`1px solid ${P.cardBorder}`}}>
+                                        {["Cuota","Interés","Total","Saldo"].map(h=>(
+                                          <th key={h} style={{padding:"6px 4px",color:P.textSub,fontWeight:600,textAlign:"right"}}>{h}</th>
+                                        ))}
+                                      </tr></thead>
+                                      <tbody>
+                                        {schedule.map((row,i)=>(
+                                          <tr key={i} style={{borderBottom:`1px solid rgba(42,42,58,0.5)`}}>
+                                            <td style={{padding:"6px 4px",color:P.accent,fontWeight:700,textAlign:"right"}}>#{row.cuota}</td>
+                                            <td style={{padding:"6px 4px",color:P.income,textAlign:"right"}}>{fmtCOP(row.interes)}</td>
+                                            <td style={{padding:"6px 4px",color:P.loan,textAlign:"right"}}>{fmtCOP(row.cuotaTotal)}</td>
+                                            <td style={{padding:"6px 4px",color:row.saldoPendiente===0?P.income:P.text,textAlign:"right"}}>{row.saldoPendiente===0?"✓":fmtCOP(row.saldoPendiente)}</td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                  <div style={{display:"flex",gap:8,marginTop:12}}>
+                                    {l.paid && <button onClick={()=>toggleLoanPaid(l.id)} style={{flex:1,height:44,borderRadius:12,border:`1px solid ${P.cardBorder}`,background:"transparent",color:P.textSub,fontWeight:600,fontSize:13,cursor:"pointer"}}>↩ Reactivar</button>}
+                                    <button onClick={()=>{setEditLoan(l.id);setLoanForm({debtor:l.debtor,amount:String(l.amount),interest:String(l.interest),interestType:l.interestType,months:String(l.months),date:l.date,note:l.note||"",account:l.account||"",useSplit:false,splits:[]});window.scrollTo(0,0);}} style={{flex:1,height:44,borderRadius:12,border:`1px solid ${P.cardBorder}`,background:"transparent",color:P.textSub,fontSize:13,fontWeight:600,cursor:"pointer"}}>Editar</button>
+                                    <button onClick={()=>{if(window.confirm(`¿Borrar este préstamo? ${!l.paid&&st.principalOut>0&&l.account?`Se devolverán ${fmtCOP(st.principalOut)} a la cuenta de donde salió.`:""}`)) deleteLoan(l);}} style={{height:44,padding:"0 16px",borderRadius:12,background:"rgba(248,113,113,0.1)",border:"none",color:P.expense,fontSize:13,fontWeight:600,cursor:"pointer"}}>Borrar</button>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                        {!showLoanForm && editLoan===null && (
+                          <button onClick={()=>{setShowLoanForm(true);window.scrollTo(0,0);}}
+                            style={{width:"100%",border:`1.5px dashed ${P.cardBorder}`,background:"transparent",color:P.accent,borderRadius:14,padding:14,fontSize:14,fontWeight:600,cursor:"pointer",marginBottom:10}}>＋ Nuevo préstamo</button>
                         )}
-                        <div style={{display:"flex",gap:8,marginTop:12}}>
-                          {l.paid && <button onClick={()=>toggleLoanPaid(l.id)} style={{flex:1,padding:"9px",borderRadius:10,border:`1px solid ${P.cardBorder}`,background:"transparent",color:P.textSub,fontWeight:600,fontSize:13,cursor:"pointer"}}>↩ Reactivar</button>}
-                          <button onClick={()=>{setEditLoan(l.id);setLoanForm({debtor:l.debtor,amount:String(l.amount),interest:String(l.interest),interestType:l.interestType,months:String(l.months),date:l.date,note:l.note||""});window.scrollTo(0,0);}} style={{padding:"9px 12px",borderRadius:10,border:`1px solid ${P.cardBorder}`,background:"transparent",color:P.textSub,fontSize:13,cursor:"pointer"}}>✏️</button>
-                          <button onClick={()=>deleteLoan(l)} style={{padding:"9px 12px",borderRadius:10,background:"rgba(248,113,113,0.1)",border:"none",color:P.expense,fontSize:13,cursor:"pointer"}}>✕</button>
-                        </div>
-                      </div>
+                        {paid.length>0 && (
+                          <button onClick={()=>setShowPaid(m=>({...m,lend:!m.lend}))} style={{width:"100%",background:"none",border:"none",color:P.accent,fontSize:12,fontWeight:600,cursor:"pointer",padding:10}}>
+                            {showPaid.lend?"Ocultar pagados":`Préstamos pagados: ${paid.length} · ver historial`}
+                          </button>
+                        )}
+                      </>
                     );
-                  })}
+                  })()}
                 </div>
               )}
 
-              {accHead("debts","🙏","Deudas (te prestan a ti)")}
-              {/* DEBTS SUB-TAB */}
-              {creditTab==="debts" && (
+              {/* PRÉSTAMOS: debo (dinero que me prestaron) */}
+              {!subView && acctTab==="prestamos" && loanSide==="owe" && (
                 <div>
+                  {(showDebtForm || editDebt!==null) && (
                   <form onSubmit={addDebt} style={{...s.card,marginBottom:16}}>
                     <div style={s.cardTitle}>{editDebt!==null?"Editar deuda":"Nueva deuda"}</div>
                     <div style={s.fieldGroup}><label style={s.label}>¿Quién te prestó?</label>
@@ -2518,119 +2773,139 @@ export default function App() {
                       );
                     })()}
                     <button type="submit" style={{...s.submitBtn("expense")}}>{editDebt!==null?"Guardar cambios":"Registrar deuda"}</button>
-                    {editDebt!==null&&<button type="button" onClick={()=>{setEditDebt(null);setDebtForm({lender:"",amount:"",interest:"",interestType:"simple",months:"",date:today(),note:"",account:"",useSplit:false,splits:[]});}} style={{...s.submitBtn("expense"),marginTop:8,background:"transparent",border:`1px solid ${P.cardBorder}`,color:P.textSub}}>Cancelar</button>}
+                    <button type="button" onClick={()=>{setShowDebtForm(false);setEditDebt(null);setDebtForm({lender:"",amount:"",interest:"",interestType:"simple",months:"",date:today(),note:"",account:"",useSplit:false,splits:[]});}} style={{...s.submitBtn("expense"),marginTop:8,background:"transparent",border:`1px solid ${P.cardBorder}`,color:P.textSub}}>Cancelar</button>
                   </form>
+                  )}
+                  {(()=>{
+                    const active = debts.filter(d=>!d.paid), paid = debts.filter(d=>d.paid);
+                    const list = showPaid.owe ? [...active,...paid] : active;
+                    return (
+                      <>
+                        {active.length===0 && !showDebtForm && editDebt===null && <div style={{...s.empty,padding:"28px 0"}}>No tienes deudas activas</div>}
+                        {list.map(d=>{
+                          const {total,interest,monthly,schedule}=calcLoan(d);
+                          const st=debtStatus(d);
+                          const src=(debtPayAcct[d.id]!==undefined?debtPayAcct[d.id]:d.account);
+                          const open=debtOpen[d.id];
+                          const cuotasHechas=Math.min(d.months, Math.floor((st.paidAmt+0.5)/(monthly||1)));
+                          const destino=d.account?acctName(d.account):(Array.isArray(d.splits)&&d.splits.length?"varias cuentas":null);
+                          return (
+                            <div key={d.id} style={{...s.card,opacity:d.paid?0.65:1}}>
+                              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8}}>
+                                <span style={{fontWeight:700,fontSize:16,color:P.text}}>{d.lender}</span>
+                                <span style={{fontSize:12,padding:"3px 10px",borderRadius:20,background:d.paid?"rgba(52,211,153,0.1)":"rgba(248,113,113,0.12)",color:d.paid?P.income:P.expense,fontWeight:600,whiteSpace:"nowrap"}}>{d.paid?"Pagado":`${cuotasHechas} de ${d.months} cuota${d.months>1?"s":""}`}</span>
+                              </div>
+                              <div style={{fontSize:12,color:P.textSub,margin:"4px 0 12px"}}>Te prestó {fmtCOP(d.amount)} · {d.interest>0?`${d.interest}% ${d.interestType==="compound"?"compuesto":"simple"}`:"sin interés"}{destino?` · ${destino}`:""}</div>
+                              {d.note&&<div style={{fontSize:12,color:P.textSub,marginTop:-6,marginBottom:12}}>{d.note}</div>}
+                              <div style={{...s.progressBg,marginBottom:8}}><div style={{...s.progressBar,width:`${st.pct}%`}}/></div>
+                              <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:14,fontVariantNumeric:"tabular-nums"}}>
+                                <span style={{color:P.textSub}}>Pagado {fmtCOP(st.paidAmt)}</span>
+                                <span style={{fontWeight:700,color:d.paid?P.income:P.expense}}>{d.paid?"Saldada":`Le debes ${fmtCOP(st.totalOut)}`}</span>
+                              </div>
+                              <div style={{display:"flex",gap:8}}>
+                                {!d.paid && st.totalOut>0 && (
+                                  <button onClick={()=>setDebtOpen(m=>({...m,[d.id]:m[d.id]==="pay"?null:"pay"}))}
+                                    style={{flex:1,height:44,border:open==="pay"?`1px solid ${P.expense}`:"none",borderRadius:12,background:open==="pay"?"transparent":"#dc2626",color:open==="pay"?P.expense:"#fff",fontWeight:700,fontSize:13,cursor:"pointer"}}>{open==="pay"?"Cerrar":"Registrar pago"}</button>
+                                )}
+                                <button onClick={()=>setDebtOpen(m=>({...m,[d.id]:m[d.id]==="detail"?null:"detail"}))}
+                                  style={{flex:(d.paid||st.totalOut<=0)?1:"0 0 auto",height:44,padding:"0 16px",border:`1px solid ${open==="detail"?P.accent:P.cardBorder}`,borderRadius:12,background:"transparent",color:open==="detail"?P.accent:P.textSub,fontWeight:600,fontSize:13,cursor:"pointer"}}>{open==="detail"?"Ocultar":"Detalle"}</button>
+                              </div>
 
-                  {debts.length===0?<div style={s.empty}>Sin deudas registradas</div>:debts.map(d=>{
-                    const {total,interest,monthly,schedule}=calcLoan(d);
-                    const st=debtStatus(d);
-                    const isExpanded=expandedDebt===d.id;
-                    const src=(debtPayAcct[d.id]!==undefined?debtPayAcct[d.id]:d.account);
-                    return(
-                      <div key={d.id} style={{...s.card,borderColor:d.paid?"#2a3a2a":P.cardBorder,opacity:d.paid?0.65:1}}>
-                        <div style={s.cardRowSb}>
-                          <span style={{fontWeight:700,fontSize:16,color:P.text}}>{d.lender}</span>
-                          <span style={{fontSize:12,padding:"3px 10px",borderRadius:20,background:d.paid?"rgba(52,211,153,0.1)":"rgba(248,113,113,0.1)",color:d.paid?P.income:P.expense,fontWeight:600}}>{d.paid?"Pagado":"Pendiente"}</span>
-                        </div>
-                        {d.note&&<div style={{fontSize:12,color:P.textSub,marginBottom:10}}>{d.note}</div>}
-                        <div style={{background:"rgba(248,113,113,0.06)",border:"1px solid rgba(248,113,113,0.15)",borderRadius:12,padding:"12px 14px",marginBottom:12}}>
-                          <div style={{fontSize:11,color:P.expense,fontWeight:700,letterSpacing:0.8,textTransform:"uppercase",marginBottom:10}}>Resumen financiero</div>
-                          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"10px 0"}}>
-                            {[["💵 Capital",fmtCOP(d.amount),P.text],["📅 Plazo",`${d.months} mes(es)`,P.text],["📈 Tasa",`${d.interest}% ${d.interestType==="compound"?"comp.":"simple"}`,P.text],["💰 Cuota/mes",fmtCOP(monthly),P.expense],["🎁 Interés",fmtCOP(interest),P.expense],["✅ Total a pagar",fmtCOP(total),P.expense]].map(([lbl,val,col])=>(
-                              <div key={lbl}><div style={{fontSize:10,color:P.textSub,marginBottom:2}}>{lbl}</div><div style={{fontSize:13,fontWeight:700,color:col}}>{val}</div></div>
-                            ))}
-                          </div>
-                        </div>
-                        {/* Pagos hechos a quien te prestó */}
-                        <div style={{background:"rgba(129,140,248,0.05)",border:"1px solid rgba(129,140,248,0.15)",borderRadius:12,padding:"12px 14px",marginBottom:12}}>
-                          <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:6}}>
-                            <span style={{color:P.textSub}}>Pagado ({st.pct}%)</span>
-                            <span style={{color:P.accent,fontWeight:700}}>{fmtCOP(st.paidAmt)} / {fmtCOP(total)}</span>
-                          </div>
-                          <div style={{...s.progressBg,marginBottom:6}}><div style={{...s.progressBar,width:`${st.pct}%`}}/></div>
-                          <div style={{fontSize:11,color:P.textSub}}>Debes {fmtCOP(st.totalOut)} · capital pendiente {fmtCOP(st.principalLeft)}</div>
-                          {!d.paid && st.totalOut>0 && accounts.length>0 && (
-                            <>
-                              <div style={{marginTop:10}}>
-                                <label style={{...s.label,marginBottom:6}}>¿Cuánto vas a pagar?</label>
-                                <input type="text" inputMode="numeric" placeholder={fmtMiles(st.suggested)+" (una cuota)"}
-                                  value={debtPayAmt[d.id]!==undefined?fmtMiles(debtPayAmt[d.id]):""}
-                                  onChange={e=>setDebtPayAmt(m=>({...m,[d.id]:onlyDigits(e.target.value)}))}
-                                  style={{...s.input,padding:"10px 12px",fontSize:14}}/>
-                                <div style={{fontSize:10,color:P.textSub,marginTop:4}}>Déjalo vacío para una cuota.</div>
-                              </div>
-                              <div style={{display:"flex",justifyContent:"flex-end",marginTop:8}}>
-                                <button onClick={()=>setDebtPaySplitOn(m=>({...m,[d.id]:!m[d.id]}))} style={{background:"none",border:"none",color:P.accent,fontSize:11,fontWeight:600,cursor:"pointer",padding:0,textDecoration:"underline"}}>
-                                  {debtPaySplitOn[d.id]?"Pagar con una sola cuenta":"Dividir este pago"}
-                                </button>
-                              </div>
-                              {debtPaySplitOn[d.id] ? (
-                                <>
-                                  <PaymentSplitter total={parseFloat(onlyDigits(debtPayAmt[d.id]))||st.suggested} cards={accounts} value={debtPaySplits[d.id]||[]} onChange={v=>setDebtPaySplits(m=>({...m,[d.id]:v}))} P={P} mode="out"/>
-                                  <button onClick={()=>{payDebt(d, debtPayAmt[d.id], debtPaySplits[d.id]||[]); setDebtPaySplits(m=>({...m,[d.id]:[]}));}}
-                                    style={{width:"100%",marginTop:10,padding:"10px",borderRadius:10,border:"none",background:`linear-gradient(135deg,#dc2626,${P.expense})`,color:"#fff",fontWeight:700,fontSize:13,cursor:"pointer"}}>
-                                    + Registrar pago
-                                  </button>
-                                </>
-                              ) : (
-                                <>
-                                  <div style={{display:"flex",flexWrap:"wrap",gap:6,marginTop:10,alignItems:"center"}}>
-                                    <span style={{fontSize:11,color:P.textSub}}>Pagar desde:</span>
-                                    {accounts.map(a=>(
-                                      <button key={a.id} onClick={()=>setDebtPayAcct(m=>({...m,[d.id]:a.id}))}
-                                        style={{padding:"4px 9px",borderRadius:16,border:`1.5px solid ${src===a.id?P.accent:P.cardBorder}`,background:src===a.id?"rgba(129,140,248,0.13)":"transparent",color:src===a.id?P.accent:P.textSub,fontSize:11,fontWeight:600,cursor:"pointer"}}>{a.name} · {fmtCOP(a.used||0)}</button>
-                                    ))}
-                                  </div>
-                                  <button onClick={()=>payDebt(d, debtPayAmt[d.id], src)}
-                                    style={{width:"100%",marginTop:10,padding:"10px",borderRadius:10,border:"none",background:`linear-gradient(135deg,#dc2626,${P.expense})`,color:"#fff",fontWeight:700,fontSize:13,cursor:"pointer"}}>
-                                    + Registrar pago
-                                  </button>
-                                </>
+                              {open==="pay" && !d.paid && st.totalOut>0 && (
+                                <div style={{marginTop:14,paddingTop:14,borderTop:`1px solid ${P.cardBorder}`}}>
+                                  {accounts.length===0 ? (
+                                    <div style={{fontSize:11,color:P.expense}}>Crea una cuenta (Efectivo/Débito) para poder pagar.</div>
+                                  ) : (
+                                    <>
+                                      <label style={{...s.label,marginBottom:6}}>¿Cuánto vas a pagar?</label>
+                                      <input type="text" inputMode="numeric" placeholder={fmtMiles(st.suggested)+" (una cuota)"}
+                                        value={debtPayAmt[d.id]!==undefined?fmtMiles(debtPayAmt[d.id]):""}
+                                        onChange={e=>setDebtPayAmt(m=>({...m,[d.id]:onlyDigits(e.target.value)}))}
+                                        style={{...s.input,padding:"10px 12px",fontSize:14}}/>
+                                      <div style={{fontSize:10,color:P.textSub,marginTop:4}}>Déjalo vacío para una cuota.</div>
+                                      <div style={{display:"flex",justifyContent:"flex-end",marginTop:8}}>
+                                        <button onClick={()=>setDebtPaySplitOn(m=>({...m,[d.id]:!m[d.id]}))} style={{background:"none",border:"none",color:P.accent,fontSize:11,fontWeight:600,cursor:"pointer",padding:0,textDecoration:"underline"}}>
+                                          {debtPaySplitOn[d.id]?"Pagar con una sola cuenta":"Dividir este pago"}
+                                        </button>
+                                      </div>
+                                      {debtPaySplitOn[d.id] ? (
+                                        <>
+                                          <PaymentSplitter total={parseFloat(onlyDigits(debtPayAmt[d.id]))||st.suggested} cards={accounts} value={debtPaySplits[d.id]||[]} onChange={v=>setDebtPaySplits(m=>({...m,[d.id]:v}))} P={P} mode="out"/>
+                                          <button onClick={()=>{payDebt(d, debtPayAmt[d.id], debtPaySplits[d.id]||[]); setDebtPaySplits(m=>({...m,[d.id]:[]}));}}
+                                            style={{width:"100%",marginTop:10,height:44,borderRadius:12,border:"none",background:"#dc2626",color:"#fff",fontWeight:700,fontSize:13,cursor:"pointer"}}>
+                                            Confirmar pago
+                                          </button>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <div style={{display:"flex",flexWrap:"wrap",gap:6,marginTop:10,alignItems:"center"}}>
+                                            <span style={{fontSize:11,color:P.textSub}}>Pagar desde:</span>
+                                            {accounts.map(a=>(
+                                              <button key={a.id} onClick={()=>setDebtPayAcct(m=>({...m,[d.id]:a.id}))}
+                                                style={{padding:"6px 10px",borderRadius:16,border:`1.5px solid ${src===a.id?P.accent:P.cardBorder}`,background:src===a.id?"rgba(129,140,248,0.13)":"transparent",color:src===a.id?P.accent:P.textSub,fontSize:11,fontWeight:600,cursor:"pointer"}}>{a.name} · {fmtCOP(a.used||0)}</button>
+                                            ))}
+                                          </div>
+                                          <button onClick={()=>payDebt(d, debtPayAmt[d.id], src)}
+                                            style={{width:"100%",marginTop:10,height:44,borderRadius:12,border:"none",background:"#dc2626",color:"#fff",fontWeight:700,fontSize:13,cursor:"pointer"}}>
+                                            Confirmar pago
+                                          </button>
+                                        </>
+                                      )}
+                                    </>
+                                  )}
+                                </div>
                               )}
-                            </>
-                          )}
-                          {!d.paid && st.totalOut>0 && accounts.length===0 && (
-                            <div style={{fontSize:11,color:P.expense,marginTop:10}}>Crea una cuenta (Efectivo/Débito) para poder pagar.</div>
-                          )}
-                        </div>
-                        <button onClick={()=>setExpandedDebt(isExpanded?null:d.id)}
-                          style={{width:"100%",padding:"9px",borderRadius:10,border:`1px solid ${isExpanded?P.accent:P.cardBorder}`,background:isExpanded?"rgba(129,140,248,0.08)":"transparent",color:isExpanded?P.accent:P.textSub,fontWeight:600,fontSize:13,cursor:"pointer",marginBottom:isExpanded?12:0}}>
-                          {isExpanded?"▲ Ocultar tabla":"▼ Ver tabla cuota a cuota"}
-                        </button>
-                        {isExpanded&&(
-                          <div style={{overflowX:"auto"}}>
-                            <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
-                              <thead><tr style={{borderBottom:`1px solid ${P.cardBorder}`}}>
-                                {["Cuota","Interés","Total","Saldo"].map(h=>(
-                                  <th key={h} style={{padding:"6px 4px",color:P.textSub,fontWeight:600,textAlign:"right"}}>{h}</th>
-                                ))}
-                              </tr></thead>
-                              <tbody>
-                                {schedule.map((row,i)=>(
-                                  <tr key={i} style={{borderBottom:`1px solid rgba(42,42,58,0.5)`,background:i%2===0?"transparent":"rgba(255,255,255,0.015)"}}>
-                                    <td style={{padding:"6px 4px",color:P.accent,fontWeight:700,textAlign:"right"}}>#{row.cuota}</td>
-                                    <td style={{padding:"6px 4px",color:P.expense,textAlign:"right"}}>{fmtCOP(row.interes)}</td>
-                                    <td style={{padding:"6px 4px",color:P.loan,textAlign:"right"}}>{fmtCOP(row.cuotaTotal)}</td>
-                                    <td style={{padding:"6px 4px",color:row.saldoPendiente===0?P.income:P.text,textAlign:"right"}}>{row.saldoPendiente===0?"✓":fmtCOP(row.saldoPendiente)}</td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                              <tfoot><tr style={{borderTop:`2px solid ${P.cardBorder}`}}>
-                                <td style={{padding:"6px 4px",color:P.textSub,fontSize:11,fontWeight:700}}>TOTAL</td>
-                                <td style={{padding:"6px 4px",color:P.expense,fontWeight:700,textAlign:"right"}}>{fmtCOP(interest)}</td>
-                                <td style={{padding:"6px 4px",color:P.loan,fontWeight:700,textAlign:"right"}}>{fmtCOP(total)}</td>
-                                <td style={{padding:"6px 4px",textAlign:"right"}}>—</td>
-                              </tr></tfoot>
-                            </table>
-                          </div>
+
+                              {open==="detail" && (
+                                <div style={{marginTop:14}}>
+                                  <div style={{background:"rgba(248,113,113,0.06)",border:"1px solid rgba(248,113,113,0.15)",borderRadius:12,padding:"12px 14px",marginBottom:12}}>
+                                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"10px 0"}}>
+                                      {[["Capital",fmtCOP(d.amount),P.text],["Plazo",`${d.months} mes(es)`,P.text],["Tasa",`${d.interest}% ${d.interestType==="compound"?"comp.":"simple"}`,P.text],["Cuota/mes",fmtCOP(monthly),P.expense],["Interés",fmtCOP(interest),P.expense],["Total a pagar",fmtCOP(total),P.expense]].map(([lbl,val,col])=>(
+                                        <div key={lbl}><div style={{fontSize:10,color:P.textSub,marginBottom:2}}>{lbl}</div><div style={{fontSize:13,fontWeight:700,color:col}}>{val}</div></div>
+                                      ))}
+                                    </div>
+                                    <div style={{fontSize:11,color:P.textSub,marginTop:10}}>Capital pendiente {fmtCOP(st.principalLeft)} · desde el {fmtDate(d.date)}</div>
+                                  </div>
+                                  <div style={{overflowX:"auto"}}>
+                                    <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+                                      <thead><tr style={{borderBottom:`1px solid ${P.cardBorder}`}}>
+                                        {["Cuota","Interés","Total","Saldo"].map(h=>(
+                                          <th key={h} style={{padding:"6px 4px",color:P.textSub,fontWeight:600,textAlign:"right"}}>{h}</th>
+                                        ))}
+                                      </tr></thead>
+                                      <tbody>
+                                        {schedule.map((row,i)=>(
+                                          <tr key={i} style={{borderBottom:`1px solid rgba(42,42,58,0.5)`}}>
+                                            <td style={{padding:"6px 4px",color:P.accent,fontWeight:700,textAlign:"right"}}>#{row.cuota}</td>
+                                            <td style={{padding:"6px 4px",color:P.expense,textAlign:"right"}}>{fmtCOP(row.interes)}</td>
+                                            <td style={{padding:"6px 4px",color:P.loan,textAlign:"right"}}>{fmtCOP(row.cuotaTotal)}</td>
+                                            <td style={{padding:"6px 4px",color:row.saldoPendiente===0?P.income:P.text,textAlign:"right"}}>{row.saldoPendiente===0?"✓":fmtCOP(row.saldoPendiente)}</td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                  <div style={{display:"flex",gap:8,marginTop:12}}>
+                                    <button onClick={()=>{setEditDebt(d.id);setDebtForm({lender:d.lender,amount:String(d.amount),interest:String(d.interest),interestType:d.interestType,months:String(d.months),date:d.date,note:d.note||"",account:d.account||"",useSplit:false,splits:[]});window.scrollTo(0,0);}} style={{flex:1,height:44,borderRadius:12,border:`1px solid ${P.cardBorder}`,background:"transparent",color:P.textSub,fontSize:13,fontWeight:600,cursor:"pointer"}}>Editar</button>
+                                    <button onClick={()=>{if(window.confirm(`¿Borrar esta deuda? ${!d.paid&&st.principalLeft>0?`Se descontará ${fmtCOP(st.principalLeft)} de la cuenta donde entró.`:""}`)) deleteDebt(d);}} style={{height:44,padding:"0 16px",borderRadius:12,background:"rgba(248,113,113,0.1)",border:"none",color:P.expense,fontSize:13,fontWeight:600,cursor:"pointer"}}>Borrar</button>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                        {!showDebtForm && editDebt===null && (
+                          <button onClick={()=>{setShowDebtForm(true);window.scrollTo(0,0);}}
+                            style={{width:"100%",border:`1.5px dashed ${P.cardBorder}`,background:"transparent",color:P.accent,borderRadius:14,padding:14,fontSize:14,fontWeight:600,cursor:"pointer",marginBottom:10}}>＋ Nueva deuda</button>
                         )}
-                        <div style={{display:"flex",gap:8,marginTop:12}}>
-                          <button onClick={()=>{setEditDebt(d.id);setDebtForm({lender:d.lender,amount:String(d.amount),interest:String(d.interest),interestType:d.interestType,months:String(d.months),date:d.date,note:d.note||"",account:d.account||""});window.scrollTo(0,0);}} style={{flex:1,padding:"9px 12px",borderRadius:10,border:`1px solid ${P.cardBorder}`,background:"transparent",color:P.textSub,fontSize:13,cursor:"pointer"}}>✏️ Editar</button>
-                          <button onClick={()=>{if(window.confirm(`¿Borrar esta deuda? ${!d.paid&&st.principalLeft>0?`Se descontará ${fmtCOP(st.principalLeft)} de la cuenta donde entró.`:""}`)) deleteDebt(d);}} style={{padding:"9px 12px",borderRadius:10,background:"rgba(248,113,113,0.1)",border:"none",color:P.expense,fontSize:13,cursor:"pointer"}}>✕</button>
-                        </div>
-                      </div>
+                        {paid.length>0 && (
+                          <button onClick={()=>setShowPaid(m=>({...m,owe:!m.owe}))} style={{width:"100%",background:"none",border:"none",color:P.accent,fontSize:12,fontWeight:600,cursor:"pointer",padding:10}}>
+                            {showPaid.owe?"Ocultar pagadas":`Deudas pagadas: ${paid.length} · ver historial`}
+                          </button>
+                        )}
+                      </>
                     );
-                  })}
+                  })()}
                 </div>
               )}
 
@@ -2685,9 +2960,13 @@ export default function App() {
           {navItems.map(n=>{
             const isAdd = n.id==="add";
             return(
-              <button key={n.id} onClick={()=>{setView(n.id);setSubView(null);}} style={s.navBtn(view===n.id, isAdd)}>
-                <span style={{fontSize:isAdd?26:17,fontWeight:isAdd?300:400,lineHeight:1,marginTop:isAdd?-2:0}}>{n.icon}</span>
-                {!isAdd&&<span style={{fontSize:10,marginTop:3,letterSpacing:0.3}}>{n.label}</span>}
+              <button key={n.id} onClick={()=>{
+                // si la app quedó abierta de un día para otro, el formulario vacío no debe arrastrar la fecha vieja
+                if(isAdd) setTxForm(f=>f.amount?f:{...f,date:today()});
+                setView(n.id);setSubView(null);
+              }} aria-label={n.label} style={s.navBtn(view===n.id, isAdd)}>
+                <span style={{display:"flex",lineHeight:0}}>{n.icon}</span>
+                {!isAdd&&<span style={{fontSize:10,marginTop:4,letterSpacing:0.3}}>{n.label}</span>}
               </button>
             );
           })}
@@ -2729,14 +3008,14 @@ function ST(P){
     // TRANSACTIONS
     txRow:{display:"flex",alignItems:"center",gap:12,padding:"12px 0",borderBottom:`1px solid rgba(255,255,255,0.04)`},
     txCard:{background:P.card,border:`1px solid ${P.cardBorder}`,borderRadius:16,padding:"14px",marginBottom:10,display:"flex",alignItems:"center",gap:12,boxShadow:"0 2px 8px rgba(0,0,0,0.15)"},
-    txIcon:(type)=>({width:40,height:40,borderRadius:12,background:type==="income"?"rgba(52,211,153,0.12)":type==="loan"?"rgba(251,191,36,0.12)":"rgba(248,113,113,0.1)",color:type==="income"?P.income:type==="loan"?P.loan:P.expense,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,flexShrink:0,boxShadow:type==="income"?"0 0 12px rgba(52,211,153,0.15)":type==="loan"?"0 0 12px rgba(251,191,36,0.1)":"0 0 12px rgba(248,113,113,0.1)"}),
+    txIcon:(type)=>({width:40,height:40,borderRadius:12,background:type==="income"?"rgba(52,211,153,0.12)":type==="loan"?"rgba(251,191,36,0.12)":type==="transfer"?"rgba(129,140,248,0.12)":"rgba(248,113,113,0.1)",color:type==="income"?P.income:type==="loan"?P.loan:type==="transfer"?P.accent:P.expense,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,flexShrink:0,boxShadow:type==="income"?"0 0 12px rgba(52,211,153,0.15)":type==="loan"?"0 0 12px rgba(251,191,36,0.1)":"0 0 12px rgba(248,113,113,0.1)"}),
     txCat:{fontSize:14,fontWeight:600,color:P.text},
     txNote:{fontSize:12,color:P.textSub,marginTop:2},
     txDate:{fontSize:11,color:P.muted},
 
     // FORMS
     toggleRow:{display:"flex",gap:10,marginBottom:20},
-    toggleBtn:(active,type)=>({flex:1,padding:"13px",borderRadius:14,border:`1.5px solid ${active?(type==="income"?P.income:P.expense):P.cardBorder}`,background:active?(type==="income"?"rgba(52,211,153,0.1)":"rgba(248,113,113,0.1)"):"transparent",color:active?(type==="income"?P.income:P.expense):P.textSub,fontWeight:700,fontSize:14,cursor:"pointer",transition:"all 0.2s"}),
+    toggleBtn:(active,type)=>({flex:1,padding:"13px 6px",borderRadius:14,border:`1.5px solid ${active?(type==="income"?P.income:type==="transfer"?P.accent:P.expense):P.cardBorder}`,background:active?(type==="income"?"rgba(52,211,153,0.1)":type==="transfer"?"rgba(129,140,248,0.12)":"rgba(248,113,113,0.1)"):"transparent",color:active?(type==="income"?P.income:type==="transfer"?P.accent:P.expense):P.textSub,fontWeight:700,fontSize:14,cursor:"pointer",transition:"all 0.2s"}),
     fieldGroup:{marginBottom:18},
     label:{display:"block",fontSize:11,color:P.textSub,marginBottom:8,fontWeight:600,letterSpacing:0.8,textTransform:"uppercase"},
     input:{width:"100%",padding:"14px 16px",background:"rgba(255,255,255,0.04)",border:`1.5px solid ${P.cardBorder}`,borderRadius:14,color:P.text,fontSize:15,outline:"none",boxSizing:"border-box",appearance:"none",transition:"border-color 0.2s"},
@@ -2767,13 +3046,13 @@ function ST(P){
       border: isAdd ? "1px solid rgba(167,139,250,0.45)" : "none",
       display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
       padding: isAdd ? 0 : "6px 0",
-      color: isAdd ? "#fff" : active ? P.accent : P.muted,
+      color: isAdd ? "#fff" : active ? P.accent : P.textSub,   // P.muted no llegaba al contraste mínimo
       cursor:"pointer",
       fontWeight: active ? 700 : 400,
       // radio 16 = mismo lenguaje que las tarjetas (18) y los inputs (14)
       borderRadius: isAdd ? 16 : 12,
-      height: isAdd ? 46 : "auto",
-      width:  isAdd ? 46 : "auto",
+      height: isAdd ? 48 : "auto",
+      width:  isAdd ? 48 : "auto",
       flexShrink: isAdd ? 0 : 1,
       margin: isAdd ? "0 10px" : 0,
       boxShadow: isAdd

@@ -10,34 +10,37 @@ Hecha con **React + Vite** y empaquetada como app Android con **Capacitor**.
 
 Los datos que se ven son de demostración.
 
-| Dashboard | Movimientos | Estadísticas |
+| Inicio | Movimientos | Estadísticas |
 |---|---|---|
 | <img src="docs/screenshots/01-dashboard.png" width="230"> | <img src="docs/screenshots/02-movimientos.png" width="230"> | <img src="docs/screenshots/03-estadisticas.png" width="230"> |
-| Balance del mes, patrimonio por cuenta y la gráfica de ingresos vs. gastos. | Historial con filtros, método de pago por movimiento y préstamos por cobrar. | Resumen, tasa de ahorro y reparto del gasto por categoría. |
+| Balance del mes, acciones rápidas (gasto, ingreso, mover) y tus cuentas en carrusel. | Agrupados por día con su total neto, buscador y filtro de traslados. | Resumen, tasa de ahorro y reparto del gasto por categoría. |
 
-| Cuentas y tarjetas | Score de crédito | Préstamos |
+| Cuentas y tarjetas | Salud del crédito | Préstamos |
 |---|---|---|
 | <img src="docs/screenshots/04-cuentas.png" width="230"> | <img src="docs/screenshots/05-credito.png" width="230"> | <img src="docs/screenshots/06-prestamos.png" width="230"> |
-| Saldos, cupos y porcentaje de uso de cada tarjeta. | Utilización del cupo, score estimado y guía por tramos. | Capital, interés, cuotas y registro de abonos parciales. |
+| Patrimonio desglosado, saldos, cupos y cuotas pendientes. | Utilización del cupo, score estimado, guía por tramos y consejos. | Lo que te deben y lo que debes, con abonos parciales. |
 
 <img src="docs/screenshots/07-agregar.png" width="230" align="right">
 
-**Nuevo movimiento** — gasto o ingreso, con categoría, cuenta de origen (o reparto
-entre varias), método de pago, nota y fecha. Cada cuenta muestra su saldo o cupo
-disponible en el mismo selector.
+**Mover fondos** — pasa plata entre tus propias cuentas (Bancolombia → Efectivo,
+Nu → Nequi…) sin registrarlo como gasto ni ingreso. Valida el saldo de origen y
+muestra cómo quedan las dos cuentas antes de confirmar. Gastos e ingresos se
+registran en la misma pantalla, con categoría, cuenta (o reparto entre varias),
+método de pago, nota y fecha.
 
 <br clear="right">
 
 ## Funciones
 
-- **Dashboard** — balance, ingresos vs. gastos y gráfica de área con periodos (día, semana, 15 días, mes, año o rango personalizado).
-- **Movimientos** — alta de ingresos/gastos con categoría, método de pago, fecha y cuenta de origen. Soporta **pago dividido** entre varias cuentas, validando fondos y cupo disponible.
+- **Inicio** — balance del mes, acciones rápidas, carrusel de cuentas y gráfica de área con periodos (día, semana, 15 días, mes, año o rango personalizado).
+- **Movimientos** — alta de ingresos/gastos con categoría, método de pago, fecha y cuenta de origen. Soporta **pago dividido** entre varias cuentas, validando fondos y cupo disponible. El historial se agrupa por día y tiene buscador.
+- **Mover fondos** — traslados entre cuentas propias que no cuentan como ingreso ni gasto; se pueden deshacer desde Movimientos.
 - **Cuentas y tarjetas** — débito, ahorros, efectivo y crédito, con logos de bancos y billeteras colombianas (Bancolombia, Nequi, Daviplata, Davivienda, BBVA, Banco de Bogotá, Occidente) o logo propio subido por el usuario.
-- **Crédito** — utilización del cupo, score estimado, planes de compras a cuotas y gastos recurrentes mensuales.
+- **Crédito** — utilización del cupo, score estimado y planes de compras a cuotas. Gastos recurrentes mensuales en Configuración.
 - **Consejos** — análisis local por reglas sobre utilización, balance y categoría de mayor gasto, con sugerencia de qué tarjeta pagar primero. No usa ninguna API externa.
-- **Préstamos y deudas** — dinero que prestaste y dinero que te prestaron, con interés simple o compuesto, plazos y abonos parciales.
+- **Préstamos y deudas** — en la misma pestaña que las cuentas: dinero que prestaste y dinero que te prestaron, con interés simple o compuesto, plazos y abonos parciales.
 - **Metas, presupuestos y categorías** — personalizables.
-- **Exportar / importar** — respaldo en CSV compartible desde Android.
+- **Exportar / importar** — respaldo completo en JSON (restaurable) y movimientos en CSV para Excel, compartibles desde Android.
 
 ## Privacidad
 
@@ -64,6 +67,8 @@ npm run preview  # sirve dist/
 npm run lint
 ```
 
+Las capturas del README se regeneran con `scripts/capturas.mjs` (instrucciones al inicio del archivo).
+
 ## Android
 
 ```bash
@@ -86,6 +91,7 @@ npx @capacitor/assets generate --android
 
 ```
 src/App.jsx     toda la app (vistas, estado, persistencia)
+scripts/        utilidades de desarrollo (capturas del README)
 src/*.css       estilos base y reset
 assets/         icono y splash fuente para @capacitor/assets
 android/        proyecto nativo generado por Capacitor
