@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Mis Finanzas · Carrusel LinkedIn</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --noche:#07101D; --noche-2:#0C1A2E; --cian:#0DDCFF; --electrico:#009DFF; --codigo:#45E8E8;
+    --plata:#DDE2EA; --gris:#9AA6B8; --verde:#34D399; --rojo:#F87171;
+  }
+  @page{ size:1080px 1350px; margin:0 }
+  *{ box-sizing:border-box; margin:0; padding:0 }
+  html,body{ background:var(--noche) }
+  body{ font-family:Inter,system-ui,sans-serif; color:var(--plata) }
+
+  .slide{
+    width:1080px; height:1350px; position:relative; overflow:hidden;
+    background:
+      radial-gradient(900px 600px at 85% -10%, rgba(0,157,255,.22), transparent 60%),
+      radial-gradient(700px 500px at -10% 110%, rgba(13,220,255,.12), transparent 60%),
+      var(--noche);
+    page-break-after:always; break-after:page;
+  }
+  /* cuadrícula de vidrio */
+  .slide::before{
+    content:""; position:absolute; inset:0;
+    background-image:
+      linear-gradient(rgba(221,226,234,.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(221,226,234,.045) 1px, transparent 1px);
+    background-size:60px 60px;
+    mask-image:linear-gradient(180deg, #000 0%, transparent 75%);
+  }
+  /* columnas de 0 y 1 */
+  .bin{
+    position:absolute; top:0; right:64px; font:500 18px/1.55 "Space Grotesk",monospace;
+    color:var(--codigo); opacity:.13; writing-mode:vertical-rl; letter-spacing:.35em;
+    white-space:nowrap;
+  }
+  .bin.b2{ right:104px; top:180px; opacity:.08 }
+
+  .top{
+    position:absolute; top:64px; left:80px; right:80px;
+    display:flex; align-items:center; justify-content:space-between; z-index:2;
+  }
+  .marca{ display:flex; align-items:center; gap:14px; font:600 22px Inter; color:var(--plata) }
+  .marca img{ height:34px }
+  .num{ font:500 22px "Space Grotesk"; color:var(--gris); letter-spacing:.08em }
+  .num b{ color:var(--cian); font-weight:700 }
+
+  .txt{ position:absolute; left:80px; right:80px; top:170px; z-index:2 }
+  .kicker{
+    font:600 22px Inter; letter-spacing:.22em; text-transform:uppercase; color:var(--cian);
+    display:flex; align-items:center; gap:14px; margin-bottom:26px;
+  }
+  .kicker::before{ content:""; width:36px; height:3px; background:var(--cian); border-radius:2px }
+  h1,h2{ font-family:"Space Grotesk"; font-weight:700; color:#fff; letter-spacing:-.02em }
+  h1{ font-size:84px; line-height:1.02 }
+  h2{ font-size:68px; line-height:1.05 }
+  .hl{ color:var(--verde) }
+  .hc{ color:var(--cian) }
+  p.lead{ font-size:32px; line-height:1.4; color:var(--plata); margin-top:28px; max-width:880px }
+  p.lead em{ font-style:normal; color:#fff; font-weight:600 }
+
+  /* teléfono que sale por abajo */
+  .phone{
+    position:absolute; left:50%; transform:translateX(-50%); bottom:-260px; width:560px;
+    border-radius:64px; padding:14px; z-index:1;
+    background:linear-gradient(160deg,#2a3a52,#0f1a2a 40%,#1b2a40);
+    box-shadow:0 0 0 2px rgba(13,220,255,.25), 0 40px 120px rgba(0,157,255,.35);
+  }
+  .phone img{ display:block; width:100%; border-radius:52px }
+  .phone.alto{ bottom:-420px }
+  .fade{
+    position:absolute; left:0; right:0; bottom:0; height:180px; z-index:1;
+    background:linear-gradient(180deg, transparent, var(--noche) 92%);
+  }
+
+  /* portada */
+  .s1 .txt{ top:180px }
+  .s1 h1{ font-size:96px }
+  .s1 .phone{ bottom:-560px; width:600px }
+
+  .s7 .txt{ top:230px }
+  .s7 h2{ font-size:78px }
+  .s7 .chips{ margin-top:64px; gap:20px }
+  .s7 .chip{ font-size:36px; padding:24px 34px }
+  .s7 .chip small{ font-size:22px }
+  .s7 .cita{ margin-top:96px; font-size:52px; padding:52px 56px }
+  .desliza{
+    position:absolute; right:80px; bottom:70px; z-index:3;
+    font:600 24px Inter; color:var(--noche); background:var(--cian);
+    padding:16px 28px; border-radius:999px;
+  }
+
+  /* láminas de texto */
+  .lista{ margin-top:56px; display:grid; gap:26px }
+  .item{
+    display:flex; gap:30px; align-items:center; padding:34px 38px; border-radius:28px;
+    background:rgba(12,26,46,.75); border:1px solid rgba(221,226,234,.10);
+  }
+  .item .big{ font:700 76px/1 "Space Grotesk"; color:var(--verde); min-width:150px }
+  .item .big.c{ color:var(--cian) }
+  .item h3{ font:700 34px "Space Grotesk"; color:#fff }
+  .item p{ font-size:26px; color:var(--gris); margin-top:6px; line-height:1.35 }
+
+  .chips{ display:flex; flex-wrap:wrap; gap:18px; margin-top:48px }
+  .chip{
+    font:600 30px "Space Grotesk"; color:#fff; padding:20px 30px; border-radius:20px;
+    background:rgba(0,157,255,.12); border:1px solid rgba(13,220,255,.35);
+  }
+  .chip small{ display:block; font:500 20px Inter; color:var(--gris); margin-top:4px }
+  .cita{
+    margin-top:70px; padding:44px 48px; border-left:6px solid var(--verde);
+    background:rgba(52,211,153,.07); border-radius:0 28px 28px 0;
+    font:700 46px/1.2 "Space Grotesk"; color:#fff;
+  }
+
+  /* cierre */
+  .s8 .centro{
+    position:absolute; inset:0; display:flex; flex-direction:column; align-items:center;
+    justify-content:center; text-align:center; padding:0 90px; z-index:2;
+  }
+  .s8 h2{ font-size:76px }
+  .s8 .repo{
+    margin-top:50px; padding:30px 44px; border-radius:24px; font:600 32px "Space Grotesk";
+    color:#fff; background:rgba(12,26,46,.85); border:1px solid rgba(13,220,255,.4);
+  }
+  .s8 .repo span{ display:block; font:500 22px Inter; color:var(--gris); margin-bottom:10px; letter-spacing:.12em; text-transform:uppercase }
+  .s8 .pregunta{ margin-top:70px; font-size:34px; line-height:1.4; color:var(--plata) }
+  .s8 .logo{ position:absolute; bottom:90px; left:50%; transform:translateX(-50%); height:92px; z-index:2 }
+</style>
+</head>
+<body>
+
+<!-- 1 · Portada -->
+<section class="slide s1">
+  <div class="bin">0110100101100110 1001011010</div><div class="bin b2">10110010111010 01101001</div>
+  <div class="top"><div class="marca"><img src="marca/07-simbolo-color.png" alt="">Mis Finanzas</div><div class="num"><b>01</b> / 08</div></div>
+  <div class="txt">
+    <div class="kicker">App Android · Proyecto personal</div>
+    <h1>Hice mi propia app de <span class="hl">finanzas.</span></h1>
+    <p class="lead">Sin nube, sin cuentas y <em>sin entregar mis datos bancarios</em> a nadie.</p>
+  </div>
+  <div class="phone"><img src="../screenshots/01-dashboard.png" alt="Pantalla de inicio de Mis Finanzas"></div>
+  <div class="fade"></div>
+  <div class="desliza">Desliza →</div>
+</section>
+
+<!-- 2 · Mover fondos -->
+<section class="slide">
+  <div class="bin">1010011101 0100110101101</div>
+  <div class="top"><div class="marca"><img src="marca/07-simbolo-color.png" alt="">Mis Finanzas</div><div class="num"><b>02</b> / 08</div></div>
+  <div class="txt">
+    <div class="kicker">Mover fondos</div>
+    <h2>Pasar plata entre <span class="hl">mis cuentas</span> no es un gasto.</h2>
+    <p class="lead">De Bancolombia a Efectivo o de Nu a Nequi, sin inflar los números. Y puedo pagar con varias cuentas a la vez, revisando saldo y cupo.</p>
+  </div>
+  <div class="phone alto"><img src="../screenshots/07-agregar.png" alt="Pantalla para mover fondos"></div>
+  <div class="fade"></div>
+</section>
+
+<!-- 3 · Salud del crédito -->
+<section class="slide">
+  <div class="bin">0111010010 1101001011010</div>
+  <div class="top"><div class="marca"><img src="marca/07-simbolo-color.png" alt="">Mis Finanzas</div><div class="num"><b>03</b> / 08</div></div>
+  <div class="txt">
+    <div class="kicker">Salud del crédito</div>
+    <h2>¿Cuánto del cupo estoy usando <span class="hl">de verdad?</span></h2>
+    <p class="lead">Utilización por tarjeta, un score estimado y qué tarjeta conviene pagar primero.</p>
+  </div>
+  <div class="phone alto"><img src="../screenshots/05-credito.png" alt="Pantalla de salud del crédito"></div>
+  <div class="fade"></div>
+</section>
+
+<!-- 4 · Préstamos -->
+<section class="slide">
+  <div class="bin">1100101101 0010110100111</div>
+  <div class="top"><div class="marca"><img src="marca/07-simbolo-color.png" alt="">Mis Finanzas</div><div class="num"><b>04</b> / 08</div></div>
+  <div class="txt">
+    <div class="kicker">Préstamos y deudas</div>
+    <h2>Lo que me deben y lo que <span class="hl">debo.</span></h2>
+    <p class="lead">Con interés simple o compuesto, plazos y abonos parciales. Se acabó el “¿cuánto era que te debía?”.</p>
+  </div>
+  <div class="phone alto"><img src="../screenshots/06-prestamos.png" alt="Pantalla de préstamos"></div>
+  <div class="fade"></div>
+</section>
+
+<!-- 5 · Estadísticas -->
+<section class="slide">
+  <div class="bin">0010110101 1011010010110</div>
+  <div class="top"><div class="marca"><img src="marca/07-simbolo-color.png" alt="">Mis Finanzas</div><div class="num"><b>05</b> / 08</div></div>
+  <div class="txt">
+    <div class="kicker">Estadísticas</div>
+    <h2>En qué se me va la plata, <span class="hl">en un vistazo.</span></h2>
+    <p class="lead">Tasa de ahorro, gasto por categoría, metas y presupuestos que yo mismo defino.</p>
+  </div>
+  <div class="phone alto"><img src="../screenshots/03-estadisticas.png" alt="Pantalla de estadísticas"></div>
+  <div class="fade"></div>
+</section>
+
+<!-- 6 · Privacidad -->
+<section class="slide">
+  <div class="bin">0110100101100110 1001011010</div><div class="bin b2">1011001011101 0110100</div>
+  <div class="top"><div class="marca"><img src="marca/07-simbolo-color.png" alt="">Mis Finanzas</div><div class="num"><b>06</b> / 08</div></div>
+  <div class="txt">
+    <div class="kicker">Privacidad primero</div>
+    <h2>Todo se queda <span class="hc">en el teléfono.</span></h2>
+    <div class="lista">
+      <div class="item"><div class="big">0</div><div><h3>Servidores</h3><p>No hay nube ni base de datos externa.</p></div></div>
+      <div class="item"><div class="big">0</div><div><h3>Cuentas de usuario</h3><p>Ni correo, ni contraseña, ni registro.</p></div></div>
+      <div class="item"><div class="big">0</div><div><h3>Datos enviados</h3><p>Los consejos salen de reglas que corren en el mismo teléfono.</p></div></div>
+      <div class="item"><div class="big c">↓</div><div><h3>Respaldo cuando quiera</h3><p>Copia completa en JSON y movimientos en CSV para Excel.</p></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- 7 · Cómo se hizo -->
+<section class="slide s7">
+  <div class="bin">1010011101 0100110101101</div>
+  <div class="top"><div class="marca"><img src="marca/07-simbolo-color.png" alt="">Mis Finanzas</div><div class="num"><b>07</b> / 08</div></div>
+  <div class="txt">
+    <div class="kicker">Cómo la hice</div>
+    <h2>Una web convertida en <span class="hl">app nativa.</span></h2>
+    <div class="chips">
+      <div class="chip">React 19<small>Interfaz</small></div>
+      <div class="chip">Vite<small>Compilación</small></div>
+      <div class="chip">Recharts<small>Gráficas</small></div>
+      <div class="chip">Capacitor 8<small>App Android</small></div>
+      <div class="chip">Preferences<small>Datos en el teléfono</small></div>
+    </div>
+    <div class="cita">Una app no necesita la nube para ser útil. A veces la mejor decisión es quitar piezas.</div>
+  </div>
+</section>
+
+<!-- 8 · Cierre -->
+<section class="slide s8">
+  <div class="bin">0110100101100110 1001011010</div><div class="bin b2">10110010111010 01101001</div>
+  <div class="top"><div class="marca"><img src="marca/07-simbolo-color.png" alt="">Mis Finanzas</div><div class="num"><b>08</b> / 08</div></div>
+  <div class="centro">
+    <div class="kicker" style="justify-content:center">Versión 1.5.0</div>
+    <h2>El código es <span class="hc">abierto.</span></h2>
+    <div class="repo"><span>GitHub</span>github.com/HANDREYMARTINEZ/mis-finanzas</div>
+    <p class="pregunta">¿Y tú cómo llevas tus finanzas?<br>¿App, Excel o libreta? Cuéntame en los comentarios.</p>
+  </div>
+  <img class="logo" src="marca/04-horizontal-oscuro.png" alt="H.A.M.C Solutions">
+</section>
+
+</body>
+</html>
